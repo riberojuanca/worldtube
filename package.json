@@ -1,0 +1,36 @@
+{
+  "name": "worldtube",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Cliente de escritorio para YouTube, con foco en un reproductor global persistente.",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev --noSandbox",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "bgutils-js": "^4.0.3",
+    "esbuild": "^0.21.5",
+    "googlevideo": "^4.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "youtubei.js": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "autoprefixer": "^10.4.20",
+    "electron": "^43.4.0",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.47",
+    "shaka-player": "^5.1.12",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}

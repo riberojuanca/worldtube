@@ -1,0 +1,3 @@
+# https://pnpm.io/next/settings#allowbuilds
+allowBuilds:
+  esbuild: true # Vite's bundled esbuild just downloads its own native binary on postinstall

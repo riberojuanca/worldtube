@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.watch-layout {
+  align-items: start;
+  display: grid;
+  grid-template:
+    'video' auto
+    'info' auto
+    'sidebar' auto / minmax(0, 1fr);
+}
+
+.watch-video-area {
+  grid-area: video;
+}
+
+.watch-video-frame {
+  margin-block-end: 16px;
+  margin-inline: auto;
+  max-inline-size: calc(80vh * 1.78);
+}
+
+.watch-info-area {
+  grid-area: info;
+  min-inline-size: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.watch-sidebar-area {
+  grid-area: sidebar;
+  min-inline-size: 0;
+}
+
+.watch-info-card,
+.watch-sidebar-card {
+  background: rgb(23 23 23);
+  border: 1px solid rgb(38 38 38);
+  border-radius: 8px;
+}
+
+.watch-info-card {
+  margin-block-end: 16px;
+  padding: 16px;
+}
+
+.watch-sidebar-card {
+  display: grid;
+  gap: 8px;
+  margin-block-end: 16px;
+  padding: 12px;
+}
+
+@media (min-width: 1051px) {
+  .watch-layout {
+    grid-template:
+      'video video sidebar' auto
+      'info info sidebar' auto / minmax(0, 1fr) minmax(0, 1fr) minmax(380px, 1fr);
+  }
+
+  .watch-sidebar-area {
+    min-inline-size: 380px;
+  }
+
+  .watch-sidebar-card {
+    margin-inline-start: 8px;
+  }
+}
+
+@media (min-width: 1051px) and (max-width: 1350px) {
+  .watch-layout {
+    grid-template:
+      'video video video' auto
+      'info info sidebar' auto / minmax(0, 1fr) minmax(0, 1fr) minmax(380px, 1fr);
+  }
+}
