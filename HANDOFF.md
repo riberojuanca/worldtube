@@ -1,4 +1,117 @@
-# WorldTube — Estado al 2026-09-12
+# WorldTube — Estado al 2026-09-13
+
+## Actualización actual: canales, biblioteca, Shorts y controles
+
+Esta sección resume el estado vigente. Las secciones fechadas del 2026-09-12 más abajo
+conservan el historial y pueden describir stores o limitaciones que ya fueron reemplazados.
+
+### Acuerdos de trabajo
+
+- Revisar primero `../freetube-audio-lab` para comportamientos que ya existen allí.
+- No ejecutar builds, typechecks ni suites de chequeos salvo pedido explícito del usuario.
+  Acumular modificaciones y validar juntas después. No usar Playwright.
+- No alterar el comportamiento de un control como solución a un problema de espacio:
+  el volumen debe expandirse horizontalmente junto a mute, como en FreeTube.
+- Todos los radios siguen en 3px; fuentes locales. No agregar login externo ni nube.
+- Si cambia main o preload, reiniciar el proceso de desarrollo. No atribuir todos los errores
+  a HMR: el `.catch()` de `VideoSaveButton` era un bug real y fue corregido en el código.
+
+### Mini reproductor y barra minimizada
+
+- Un único video/player permanece montado en `GlobalPlayerHost`; cambia de slot mediante
+  un mount DOM persistente. Minimizar/restaurar no requiere volver a presionar Play.
+- Mini arrastrable; al acercarlo abajo aparece una previsualización transparente con borde,
+  ocultando el mini para no mostrar dos reproductores. Solo se fija la barra al soltar.
+- Arrastrar la barra hacia arriba devuelve el mini junto al cursor, sin retenerlo abajo.
+  La flecha de restauración sigue devolviéndolo a su ubicación natural.
+- Links/botones conservan pointer y las zonas de drag usan grab/grabbing. Los rangos no
+  inician drag. El título vuelve a Watch; no hay un handle de arrastre artificial.
+- Se oculta el título de Shaka dentro del mini. La flecha de minimizar está junto a cerrar
+  y apunta abajo a la izquierda. Mini actual: 480px máximo en desktop, aspect-ratio 16:9.
+- Barra minimizada ocupa el área de contenido sin tapar la navegación izquierda. Timeline
+  central editable, seek por tiempo y volumen; rangos sin borde y con radio global.
+- `PLAYER_COMMAND_EVENT` admite `seek-to` y `set-volume`; `PLAYER_STATE_EVENT` incluye volumen.
+
+### Biblioteca local: dos acciones distintas
+
+- `VideoSaveButton` tiene modos `saved`, `playlists` y el modo combinado conservado internamente.
+  Las vistas usan las dos acciones separadas (`VideoSaveActions`) o botones individuales en Shorts.
+- Bookmark/Guardar agrega o quita exclusivamente de Guardados (`playlistId: null`), muestra
+  estado activo y no abre un selector. El signo + abre únicamente playlists existentes y permite
+  crear una nueva y guardar el video en ella. Puede estar en varios destinos a la vez.
+- Aplica a las grillas compartidas, relacionados de Watch, acciones de Watch y modal de Shorts.
+- `localDb.ts` valida playlists y deduplica por videoId + playlistId. Se refrescan biblioteca y
+  botones con `worldtube:profile-data-changed`; cambios de perfil recargan el estado.
+- `/saved` lista solo videos sin playlist; `/playlists` muestra nombre, descripción, conteo y
+  hasta tres enlaces de videos por lista. La navegación de playlists públicas del canal es aparte.
+
+### Canales completos y carga limitada
+
+- `channelBrowse.ts` consulta cada pestaña de `youtubei.js`, serializa videos, playlists,
+  publicaciones y shelves, y conserva continuaciones independientes en memoria.
+- Pestañas según disponibilidad: Inicio, Videos, Shorts, Directos, Playlists, Podcasts,
+  Lanzamientos, Cursos, Comunidad, Información y Buscar. Inicio respeta destacados/shelves.
+- Banner y avatar contemplan `PageHeader` moderno; filtros, orden, categorías y enlaces de
+  Información se muestran cuando existen. Comunidad muestra texto, imágenes, videos,
+  playlists y opciones de encuestas/quiz de lectura; no se vota con una cuenta de YouTube.
+- Videos de canales musicales Topic sin pestaña Videos usan la playlist de subidas UU.
+- Tres continuaciones automáticas exitosas por sección, luego solo botón Cargar más.
+  Las cargas manuales no reinician el contador. No hay scroll infinito indefinido.
+- Pestaña, búsqueda, filtros y playlist pública abierta viven en query params. El renderer
+  conserva páginas en caché y descarta respuestas antiguas al cambiar de sección.
+- Canal base cacheado cinco minutos, máximo 30; continuaciones de hasta una hora, máximo 80.
+  No se exportan: son resultados remotos temporales. Si vencen, usar Recargar sección.
+
+### Modal de Shorts
+
+- Slot `#global-player-shorts-slot` tiene prioridad sobre Watch/mini. El mini se oculta mientras
+  el modal está abierto; no se crea otro Shaka ni un segundo video.
+- Modal nativo `dialog`: mismo ancho que el video, tamaño limitado por ventana, sin scrollbar
+  del modal. Escape, cerrar o clic afuera detienen el Short y cancelan solicitudes pendientes.
+- Barra derecha alineada al alto del video: cerrar y conteo arriba, solo anterior/siguiente
+  al centro, Guardar y + para playlists abajo. Se retiró el botón extra de abrir Watch.
+- Flechas hacen transición vertical de 320ms: imagen del frame saliente (o thumbnail fallback)
+  y reproductor entrante, sin remontar el slot. Reduced motion reduce la animación.
+- `ended` avanza al siguiente Short cargado; la carga solicita Play explícitamente. Al llegar
+  al último de la lista cargada no solicita automáticamente nuevos Shorts desde el modal.
+- Shorts también se reconocen en shelves de Inicio cuyo título contiene Shorts. No se infiere
+  que todos los resultados de búsqueda sean Shorts ni se cambia su ruta automáticamente.
+
+### Audio global y controles compactos
+
+- `settings.playerAudio = { volume, muted }` se guarda en la DB global, no por perfil.
+  IPC get/set restaura el valor antes de cargar el video y persiste cada `volumechange`.
+- Volumen y silencio viajan en el paquete local exportado, junto con los demás settings.
+- SABR conserva `isOriginal`, audio default y etiqueta; roles main/alternate y prioridad
+  original reemplazan el antiguo `primary: true` para todas las pistas. DASH usa sus roles.
+  El adapter también prioriza original antes de tener una variante activa.
+- Configuración compacta basada en FreeTube: play, mute, volumen horizontal, tiempo, spacer,
+  queue cuando disponible, settings y fullscreen. Watch conserva su configuración completa.
+- CSS compacto ancla los controles a la izquierda, permite reducir el spacer y limita el
+  ancho expandido del volumen por ancho del contenedor. No hay popup flotante de volumen.
+
+### Búsqueda e imágenes
+
+- Historial de hasta 50 consultas por perfil, deduplicadas sin distinguir mayúsculas;
+  se guarda en `searchHistories`, se exporta/importa y se elimina junto al perfil/usuario.
+- SearchBar mezcla coincidencias recientes con sugerencias remotas, debounce 200ms,
+  dedupe y hasta ocho entradas; consulta vacía muestra recientes.
+- Guardas de APIs nuevas evitan crashes con preload viejo, pero hace falta reiniciar para
+  activar esas funcionalidades. No simular datos locales como reemplazo del IPC.
+- `VideoThumbnail` intenta URL original, hqdefault, mqdefault y default antes de fallback.
+  `ChannelAvatar` usa iniciales si la imagen falla; aplicado en canal, sidebar, subs y Watch.
+
+### Validación y pendientes
+
+- Hubo revisión manual iterativa del usuario y logs de `getInfo`, `load` y `playing` reales,
+  además de reinicios de Electron para main/preload. El último reinicio fue tras corregir
+  `.catch()` unido erróneamente a `addEventListener` y separar Guardar/Playlists globalmente.
+- No se ejecutaron builds de producción, typechecks ni suites automatizadas en esta sesión.
+- Pendiente: validación acumulada de pestañas especiales, filtros/categorías y continuaciones,
+  audio original con múltiples idiomas, persistencia tras reinicio/export-import y tamaños
+  compactos en distintas pantallas. No describir esos casos como pruebas ya realizadas.
+- Siguen pendientes capítulos, comentarios, playlist/queue en sidebar de Watch, live chat
+  y estados avanzados, y preferencias para ocultar secciones.
 
 App de escritorio propia para YouTube, continuación del laboratorio hecho sobre FreeTube en
 `../freetube-audio-lab` (ver su `MINI_PLAYER_HANDOFF.md`). Código propio, aprendizaje reusado.
@@ -17,7 +130,8 @@ el comportamiento equivalente. Esto aplica especialmente a `Watch`, al player gl
 player y a Shaka.
 
 No usar Playwright en este proyecto. La verificación se hace leyendo código, comparando con
-FreeTube Lab, mirando logs de la app levantada y corriendo `typecheck`/`build`.
+FreeTube Lab y mirando logs de la app levantada. `typecheck`/`build` quedan para cuando el
+usuario pida validación acumulada.
 
 ## Arquitectura
 

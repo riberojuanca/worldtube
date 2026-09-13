@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ChannelAvatar } from '../components/ChannelAvatar'
+import { VideoSaveActions } from '../components/VideoSaveButton'
+import { VideoThumbnail } from '../components/VideoCard'
 import { WATCH_SLOT_ID } from '../player/GlobalPlayerHost'
 import { useGlobalPlayer } from '../player/GlobalPlayerContext'
 import { PLAYER_SEEK_EVENT } from '../player/events'
@@ -101,18 +104,27 @@ function RelatedVideoRow({ video }: { video: SearchResultItem }) {
 
   return (
     <article className="group grid grid-cols-[150px_minmax(0,1fr)] gap-2 rounded p-1 transition-colors hover:bg-neutral-900 max-[480px]:grid-cols-[132px_minmax(0,1fr)]">
-      <Link
-        to={`/watch/${video.videoId}`}
-        className="relative aspect-video overflow-hidden rounded bg-neutral-900"
-        aria-label={video.title}
-      >
-        {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />}
-        {video.durationText && (
-          <span className="absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 text-[11px] font-medium leading-none text-white">
-            {video.durationText}
-          </span>
-        )}
-      </Link>
+      <div className="relative aspect-video rounded bg-neutral-900">
+        <Link to={`/watch/${video.videoId}`} className="block h-full w-full overflow-hidden rounded" aria-label={video.title}>
+          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} />
+          {video.durationText && (
+            <span className="absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 text-[11px] font-medium leading-none text-white">
+              {video.durationText}
+            </span>
+          )}
+        </Link>
+        <VideoSaveActions
+          className="absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-[680px]:opacity-100"
+          video={{
+            videoId: video.videoId,
+            title: video.title,
+            channelId: video.channelId,
+            channelName: video.channelName,
+            thumbnailUrl: video.thumbnailUrl,
+            playlistId: null
+          }}
+        />
+      </div>
       <div className="min-w-0 pt-0.5">
         <Link to={`/watch/${video.videoId}`} className="block">
           <h3 className="line-clamp-2 text-sm font-medium leading-snug text-neutral-100 group-hover:text-white">
@@ -141,6 +153,7 @@ export function Watch() {
     channelId,
     channelName,
     channelThumbnailUrl,
+    thumbnailUrl,
     subscriberCountText,
     durationText,
     viewCountText,
@@ -244,13 +257,7 @@ export function Watch() {
 
             <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                {channelThumbnailUrl ? (
-                  <img src={channelThumbnailUrl} alt="" className="h-11 w-11 shrink-0 rounded-full bg-neutral-800 object-cover" />
-                ) : (
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-neutral-800 text-sm font-semibold text-neutral-200">
-                    {channelName ? channelName.slice(0, 2).toUpperCase() : 'WT'}
-                  </div>
-                )}
+                <ChannelAvatar name={channelName} thumbnailUrl={channelThumbnailUrl} className="h-11 w-11" />
                 <div className="min-w-0">
                   {channelId ? (
                     <Link to={`/channel/${channelId}`} className="block truncate font-medium text-neutral-200 hover:text-white">
@@ -286,6 +293,14 @@ export function Watch() {
                   <Icon name="copy" className="h-4 w-4" />
                   {copyState === 'copied' ? 'Copiado' : copyState === 'error' ? 'Error' : 'Copiar enlace'}
                 </button>
+                {videoId && (
+                  <VideoSaveActions
+                    className="relative"
+                    buttonClassName="inline-flex h-9 items-center gap-2 rounded bg-neutral-800 px-4 text-sm font-medium text-neutral-200 hover:bg-neutral-700"
+                    label="Guardar"
+                    video={{ videoId, title, channelId, channelName, thumbnailUrl, playlistId: null }}
+                  />
+                )}
                 {likeCountText && (
                   <span className="inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200">
                     <Icon name="thumb" className="h-4 w-4" />

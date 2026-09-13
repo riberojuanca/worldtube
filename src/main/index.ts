@@ -6,31 +6,43 @@ import type {
   CreateLocalUserRequest,
   DeleteLocalUserRequest,
   CreateProfileRequest,
+  CreateSavedPlaylistRequest,
   LocalSessionState,
   LoginLocalUserRequest,
   ProfilesState,
+  SaveVideoRequest,
   SearchRequest,
   SearchResponse,
+  SearchSuggestionsResponse,
   Subscription,
   UpdateProfileRequest,
   VideoInfoRequest,
   VideoInfoResponse
 } from '../shared/ipc'
-import { fetchVideoInfo, getChannelInfo, getHomeFeed, getSubscriptionsFeed, searchVideos } from './youtube'
+import { fetchVideoInfo, getChannelInfo, getHomeFeed, getSearchSuggestions, getSubscriptionsFeed, searchVideos } from './youtube'
+import { getChannelPage } from './channelBrowse'
+import type { ChannelPageRequest, ChannelPageResponse } from '../shared/ipc'
 import { clearHistory, getHistory } from './historyStore'
 import {
   createLocalUser,
+  createActiveSavedPlaylist,
   deleteLocalUser,
   createUserProfile,
   exportLocalData,
   getProfilesState,
   getSessionState,
+  getPlayerAudioPreferences,
+  setPlayerAudioPreferences,
   importLocalData,
+  listActiveSearchHistory,
   listActiveSavedPlaylists,
   listActiveSavedVideos,
   loginLocalUser,
   logoutLocalUser,
+  recordActiveSearchQuery,
+  removeActiveSavedVideo,
   removeUserProfile,
+  saveActiveVideo,
   setActiveUserProfile,
   updateUserProfile
 } from './localDb'
@@ -120,7 +132,19 @@ ipcMain.handle(
 
 ipcMain.handle(IPC_CHANNELS.SEARCH, async (_event, { query }: SearchRequest): Promise<SearchResponse> => {
   try {
+    await recordActiveSearchQuery(query).catch((error) => {
+      console.warn('[search-history] failed to record query', error)
+    })
     const data = await searchVideos(query)
+    return { ok: true, data }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle(IPC_CHANNELS.SEARCH_SUGGESTIONS, async (_event, { query }: SearchRequest): Promise<SearchSuggestionsResponse> => {
+  try {
+    const data = await getSearchSuggestions(query)
     return { ok: true, data }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
@@ -138,14 +162,24 @@ ipcMain.handle(IPC_CHANNELS.GET_HOME_FEED, async (): Promise<SearchResponse> => 
 
 ipcMain.handle(IPC_CHANNELS.GET_CHANNEL, async (_event, { channelId }: { channelId: string }): Promise<ChannelResponse> => {
   try {
-    const data = await getChannelInfo(channelId)
+    const data = await getChannelInfo(channelId, false)
     return { ok: true, data }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
+ipcMain.handle(IPC_CHANNELS.CHANNEL_PAGE, async (_event, request: ChannelPageRequest): Promise<ChannelPageResponse> => {
+  try {
+    return { ok: true, data: await getChannelPage(request) }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
 ipcMain.handle(IPC_CHANNELS.SESSION_GET_STATE, (): Promise<LocalSessionState> => getSessionState())
+ipcMain.handle(IPC_CHANNELS.PLAYER_AUDIO_GET, () => getPlayerAudioPreferences())
+ipcMain.handle(IPC_CHANNELS.PLAYER_AUDIO_SET, (_event, audio: import('../shared/ipc').PlayerAudioPreferences) => setPlayerAudioPreferences(audio))
 ipcMain.handle(IPC_CHANNELS.SESSION_CREATE_USER, (_event, request: CreateLocalUserRequest): Promise<LocalSessionState> => createLocalUser(request))
 ipcMain.handle(IPC_CHANNELS.SESSION_LOGIN, (_event, request: LoginLocalUserRequest): Promise<LocalSessionState> => loginLocalUser(request))
 ipcMain.handle(IPC_CHANNELS.SESSION_LOGOUT, (): Promise<LocalSessionState> => logoutLocalUser())
@@ -185,7 +219,14 @@ ipcMain.handle(IPC_CHANNELS.HISTORY_LIST, () => getHistory())
 ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, () => clearHistory())
 
 ipcMain.handle(IPC_CHANNELS.SAVED_PLAYLISTS_LIST, () => listActiveSavedPlaylists())
-ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_LIST, () => listActiveSavedVideos())
+ipcMain.handle(IPC_CHANNELS.SAVED_PLAYLISTS_CREATE, (_event, request: CreateSavedPlaylistRequest) => createActiveSavedPlaylist(request))
+ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_LIST, (_event, playlistId?: string | null) => listActiveSavedVideos(playlistId))
+ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_SAVE, (_event, request: SaveVideoRequest) => saveActiveVideo(request))
+ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_REMOVE, (_event, videoId: string, playlistId?: string | null) =>
+  removeActiveSavedVideo(videoId, playlistId)
+)
+ipcMain.handle(IPC_CHANNELS.SEARCH_HISTORY_LIST, () => listActiveSearchHistory())
+ipcMain.handle(IPC_CHANNELS.SEARCH_HISTORY_RECORD, (_event, query: string) => recordActiveSearchQuery(query))
 
 ipcMain.handle(IPC_CHANNELS.SUBSCRIPTIONS_LIST, () => listSubscriptions())
 ipcMain.handle(IPC_CHANNELS.SUBSCRIPTIONS_FEED, async (): Promise<SearchResponse> => {

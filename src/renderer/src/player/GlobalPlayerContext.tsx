@@ -7,6 +7,7 @@ export interface GlobalPlayerState {
   channelId: string | null
   channelName: string
   channelThumbnailUrl: string | null
+  thumbnailUrl: string | null
   subscriberCountText: string | null
   durationText: string | null
   viewCountText: string | null
@@ -26,6 +27,9 @@ export interface GlobalPlayerState {
 interface GlobalPlayerContextValue extends GlobalPlayerState {
   playVideo: (videoId: string) => Promise<void>
   closePlayer: () => void
+  shorts: SearchResultItem[]
+  openShort: (videoId: string, videos: SearchResultItem[]) => void
+  dismissShorts: () => void
 }
 
 const initialState: GlobalPlayerState = {
@@ -34,6 +38,7 @@ const initialState: GlobalPlayerState = {
   channelId: null,
   channelName: '',
   channelThumbnailUrl: null,
+  thumbnailUrl: null,
   subscriberCountText: null,
   durationText: null,
   viewCountText: null,
@@ -54,6 +59,7 @@ const GlobalPlayerContext = createContext<GlobalPlayerContextValue | null>(null)
 
 export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<GlobalPlayerState>(initialState)
+  const [shorts, setShorts] = useState<SearchResultItem[]>([])
 
   // Guards against a stale response winning a race if the user jumps to a
   // second video before the first `getVideoInfo` call has resolved.
@@ -99,6 +105,7 @@ export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
         channelId: response.data.channelId,
         channelName: response.data.channelName,
         channelThumbnailUrl: response.data.channelThumbnailUrl,
+        thumbnailUrl: response.data.thumbnailUrl,
         subscriberCountText: response.data.subscriberCountText,
         durationText: response.data.durationText,
         viewCountText: response.data.viewCountText,
@@ -123,6 +130,7 @@ export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
       channelId: response.data.channelId,
       channelName: response.data.channelName,
       channelThumbnailUrl: response.data.channelThumbnailUrl,
+      thumbnailUrl: response.data.thumbnailUrl,
       subscriberCountText: response.data.subscriberCountText,
       durationText: response.data.durationText,
       viewCountText: response.data.viewCountText,
@@ -141,12 +149,22 @@ export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const closePlayer = useCallback(() => {
+    requestIdRef.current++
+    inFlightVideoIdRef.current = null
+    setShorts([])
     setState(initialState)
   }, [])
 
+  const openShort = useCallback((videoId: string, videos: SearchResultItem[]) => {
+    setShorts(videos)
+    if (state.videoId !== videoId) void playVideo(videoId)
+  }, [state.videoId, playVideo])
+
+  const dismissShorts = useCallback(() => setShorts([]), [])
+
   const value = useMemo<GlobalPlayerContextValue>(
-    () => ({ ...state, playVideo, closePlayer }),
-    [state, playVideo, closePlayer]
+    () => ({ ...state, playVideo, closePlayer, shorts, openShort, dismissShorts }),
+    [state, playVideo, closePlayer, shorts, openShort, dismissShorts]
   )
 
   return <GlobalPlayerContext.Provider value={value}>{children}</GlobalPlayerContext.Provider>

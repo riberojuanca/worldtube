@@ -204,12 +204,12 @@ function createAudioStream(
     bandwidth: format.bitrate,
     audioSamplingRate: format.audioSampleRate ?? null,
     channelsCount: format.audioChannels ?? null,
-    label: null,
+    label: format.audioLabel ?? null,
     language: format.language ?? 'und',
     originalLanguage: format.language ?? null,
     spatialAudio: format.spatialAudio,
-    roles: [],
-    primary: true,
+    roles: [format.isOriginal === false ? 'alternate' : 'main'],
+    primary: format.isOriginal ?? format.isDefault ?? true,
     segmentIndex: null,
     createSegmentIndex: async () => {
       if (stream.segmentIndex) return

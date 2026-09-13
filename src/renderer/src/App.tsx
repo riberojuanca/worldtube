@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ChangeEvent,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { GlobalPlayerProvider, useGlobalPlayer } from './player/GlobalPlayerContext'
 import { GlobalPlayerHost, MINI_SLOT_ID } from './player/GlobalPlayerHost'
+import { ShortsModal } from './player/ShortsModal'
 import { PLAYER_COMMAND_EVENT, PLAYER_STATE_EVENT, type PlayerCommandDetail, type PlayerStateDetail } from './player/events'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ChannelAvatar } from './components/ChannelAvatar'
 import { ProfileProvider, useProfiles } from './profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from './profiles/events'
 import { Channel } from './pages/Channel'
@@ -15,43 +25,67 @@ import { Saved } from './pages/Saved'
 import { Search } from './pages/Search'
 import { Subscriptions } from './pages/Subscriptions'
 import { Watch } from './pages/Watch'
-import type { Subscription, UserProfile } from '../../shared/ipc'
+import type { SearchHistoryEntry, Subscription, UserProfile } from '../../shared/ipc'
 
 type IconName =
+  | 'arrowDownRight'
   | 'arrowUpRight'
   | 'back'
   | 'bookmark'
   | 'database'
   | 'forward'
+  | 'forward10'
   | 'history'
   | 'home'
   | 'list'
   | 'menu'
   | 'pause'
   | 'play'
+  | 'replay10'
   | 'rewind'
   | 'rss'
   | 'search'
   | 'user'
+  | 'volume'
   | 'x'
 
 function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
   const paths: Record<IconName, JSX.Element> = {
+    arrowDownRight: <path d="m17 7-10 10M7 9v8h8" />,
     arrowUpRight: <path d="M7 17 17 7M9 7h8v8" />,
     back: <path d="M15 6 9 12l6 6M10 12h11" />,
     bookmark: <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />,
     database: <path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />,
     forward: <path d="m9 6 6 6-6 6M14 12H3" />,
+    forward10: (
+      <>
+        <path d="M15 5h4v4" />
+        <path d="M18.5 9A7 7 0 1 0 17 17.3" />
+        <text fill="currentColor" fontSize="7" fontWeight="700" stroke="none" textAnchor="middle" x="12" y="15.5">
+          10
+        </text>
+      </>
+    ),
     history: <path d="M12 8v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v5h5" />,
     home: <path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
     list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,
     pause: <path d="M8 5v14M16 5v14" />,
     play: <path d="m8 5 11 7-11 7V5Z" />,
+    replay10: (
+      <>
+        <path d="M9 5H5v4" />
+        <path d="M5.5 9A7 7 0 1 1 7 17.3" />
+        <text fill="currentColor" fontSize="7" fontWeight="700" stroke="none" textAnchor="middle" x="12" y="15.5">
+          10
+        </text>
+      </>
+    ),
     rewind: <path d="m11 19-8-7 8-7v14Zm10 0-8-7 8-7v14Z" />,
     rss: <path d="M5 5a14 14 0 0 1 14 14M5 12a7 7 0 0 1 7 7M5 19h.01" />,
     search: <path d="m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4z" />,
     user: <path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" />,
+    volume: <path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />,
     x: <path d="M6 6l12 12M18 6 6 18" />
   }
 
@@ -253,30 +287,151 @@ function ProfileMenu() {
 function SearchBar() {
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') ?? '')
+  const [history, setHistory] = useState<SearchHistoryEntry[]>([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const formRef = useRef<HTMLFormElement | null>(null)
   const navigate = useNavigate()
+  const { activeProfileId } = useProfiles()
 
   useEffect(() => {
     setQuery(searchParams.get('q') ?? '')
   }, [searchParams])
 
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault()
+  useEffect(() => {
+    let cancelled = false
+    if (typeof window.api.listSearchHistory !== 'function') {
+      setHistory([])
+      return
+    }
+    window.api
+      .listSearchHistory()
+      .then((entries) => {
+        if (!cancelled) setHistory(entries)
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeProfileId])
+
+  useEffect(() => {
+    if (!isDropdownOpen) return
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!formRef.current?.contains(event.target as Node)) setIsDropdownOpen(false)
+    }
+    window.addEventListener('pointerdown', closeOnOutsidePointer)
+
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsidePointer)
+    }
+  }, [isDropdownOpen])
+
+  useEffect(() => {
     const trimmed = query.trim()
+    if (!isDropdownOpen || !trimmed) {
+      setSuggestions([])
+      return
+    }
+
+    let cancelled = false
+    const timeoutId = window.setTimeout(() => {
+      if (typeof window.api.getSearchSuggestions !== 'function') {
+        setSuggestions([])
+        return
+      }
+      window.api.getSearchSuggestions(trimmed).then((response) => {
+        if (cancelled) return
+        setSuggestions(response.ok ? response.data.slice(0, 8) : [])
+      })
+    }, 200)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [isDropdownOpen, query])
+
+  async function runSearch(value: string) {
+    const trimmed = value.trim()
     if (!trimmed) return
+    try {
+      if (typeof window.api.recordSearchQuery === 'function') {
+        const nextHistory = await window.api.recordSearchQuery(trimmed)
+        setHistory(nextHistory)
+      }
+    } catch {
+      // Search itself still works even if local history cannot be updated.
+    }
+    setIsDropdownOpen(false)
     navigate(`/search?q=${encodeURIComponent(trimmed)}`)
   }
 
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    runSearch(query)
+  }
+
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const recentMatches = history
+    .filter((entry) => !normalizedQuery || entry.query.toLocaleLowerCase().includes(normalizedQuery))
+    .slice(0, normalizedQuery ? 4 : 8)
+  const recentNames = new Set(recentMatches.map((entry) => entry.query.toLocaleLowerCase()))
+  const suggestionItems = normalizedQuery
+    ? suggestions.filter((suggestion) => !recentNames.has(suggestion.toLocaleLowerCase())).slice(0, Math.max(0, 8 - recentMatches.length))
+    : []
+  const hasDropdownItems = recentMatches.length > 0 || suggestionItems.length > 0
+
   return (
-    <form onSubmit={handleSubmit} className="flex w-full items-center gap-2">
+    <form ref={formRef} onSubmit={handleSubmit} className="relative flex w-full items-center gap-2">
       <label className="flex min-w-0 flex-1 items-center gap-2 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm focus-within:border-neutral-500">
         <Icon name="search" className="h-4 w-4 shrink-0 text-neutral-500" />
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setIsDropdownOpen(true)
+          }}
+          onFocus={() => setIsDropdownOpen(true)}
           placeholder="Buscar / Ir a URL"
           className="min-w-0 flex-1 bg-transparent outline-none"
         />
       </label>
+      {isDropdownOpen && hasDropdownItems && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded border border-neutral-800 bg-neutral-950 py-1 shadow-2xl shadow-black/40">
+          {recentMatches.map((entry) => (
+            <button
+              key={`history:${entry.query}`}
+              type="button"
+              onClick={() => {
+                setQuery(entry.query)
+                runSearch(entry.query)
+              }}
+              className="flex h-9 w-full items-center gap-2 px-3 text-left text-sm text-neutral-300 hover:bg-neutral-900 hover:text-white"
+            >
+              <Icon name="history" className="h-4 w-4 shrink-0 text-neutral-500" />
+              <span className="truncate">{entry.query}</span>
+            </button>
+          ))}
+          {suggestionItems.map((suggestion) => (
+            <button
+              key={`suggestion:${suggestion}`}
+              type="button"
+              onClick={() => {
+                setQuery(suggestion)
+                runSearch(suggestion)
+              }}
+              className="flex h-9 w-full items-center gap-2 px-3 text-left text-sm text-neutral-300 hover:bg-neutral-900 hover:text-white"
+            >
+              <Icon name="search" className="h-4 w-4 shrink-0 text-neutral-500" />
+              <span className="truncate">{suggestion}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </form>
   )
 }
@@ -438,13 +593,7 @@ function SideNav({ isOpen }: { isOpen: boolean }) {
                   className={({ isActive }) => navClass(isOpen, isActive)}
                   title={channel.channelName}
                 >
-                  {channel.thumbnailUrl ? (
-                    <img src={channel.thumbnailUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-                  ) : (
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-neutral-800 text-xs font-semibold">
-                      {channel.channelName.slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
+                  <ChannelAvatar name={channel.channelName} thumbnailUrl={channel.thumbnailUrl} />
                   {isOpen && <span className="truncate text-sm">{channel.channelName}</span>}
                 </NavLink>
               ))}
@@ -480,20 +629,27 @@ function sendPlayerCommand(detail: PlayerCommandDetail) {
   window.dispatchEvent(new CustomEvent<PlayerCommandDetail>(PLAYER_COMMAND_EVENT, { detail }))
 }
 
-function isMinimizeGesture(event: PointerEvent, startY: number): boolean {
-  return event.clientY - startY > 90
+function isMinimizeGesture(event: PointerEvent, drag: { startY: number; offsetY: number; height: number }): boolean {
+  const draggedBottom = event.clientY - drag.offsetY + drag.height
+  return event.clientY - drag.startY > 28 && draggedBottom >= window.innerHeight - 72
+}
+
+function isRangeControlTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest('input[type="range"], select, textarea, [role="slider"]'))
 }
 
 function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
-  const { videoId, title, channelName, closePlayer } = useGlobalPlayer()
+  const { videoId, title, channelName, closePlayer, shorts } = useGlobalPlayer()
   const location = useLocation()
   const navigate = useNavigate()
   const [isMinimized, setIsMinimized] = useState(false)
   const [isMinimizePreview, setIsMinimizePreview] = useState(false)
   const [isRestorePreview, setIsRestorePreview] = useState(false)
+  const [isDragPointerActive, setIsDragPointerActive] = useState(false)
   const [miniPosition, setMiniPosition] = useState<{ x: number; y: number } | null>(null)
-  const [playerState, setPlayerState] = useState<PlayerStateDetail>({ paused: true, currentTime: 0, duration: 0 })
+  const [playerState, setPlayerState] = useState<PlayerStateDetail>({ paused: true, currentTime: 0, duration: 0, volume: 1 })
   const miniRef = useRef<HTMLDivElement | null>(null)
+  const minimizedBarRef = useRef<HTMLElement | null>(null)
   const dragRef = useRef<{
     startX: number
     startY: number
@@ -512,14 +668,25 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
     height: number
     moved: boolean
   } | null>(null)
+  const lastDragEndAtRef = useRef(Number.NEGATIVE_INFINITY)
   const isWatchRoute = location.pathname.startsWith('/watch/')
 
   useEffect(() => {
     setIsMinimized(false)
     setIsMinimizePreview(false)
     setIsRestorePreview(false)
+    setIsDragPointerActive(false)
     setMiniPosition(null)
   }, [videoId])
+
+  useEffect(() => {
+    if (!isDragPointerActive) return
+    const previousCursor = document.body.style.cursor
+    document.body.style.cursor = 'grabbing'
+    return () => {
+      document.body.style.cursor = previousCursor
+    }
+  }, [isDragPointerActive])
 
   useEffect(() => {
     const handlePlayerState = (event: Event) => {
@@ -531,10 +698,30 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
     return () => window.removeEventListener(PLAYER_STATE_EVENT, handlePlayerState)
   }, [videoId])
 
-  function handleDragStart(event: ReactPointerEvent<HTMLButtonElement>) {
+  function handleDraggedClickCapture(event: ReactMouseEvent<HTMLElement>) {
+    if (performance.now() - lastDragEndAtRef.current > 250) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  function handleTimelineChange(event: ChangeEvent<HTMLInputElement>) {
+    const seconds = Number(event.currentTarget.value)
+    if (!Number.isFinite(seconds)) return
+    sendPlayerCommand({ action: 'seek-to', seconds })
+  }
+
+  function handleVolumeChange(event: ChangeEvent<HTMLInputElement>) {
+    const volume = Number(event.currentTarget.value)
+    if (!Number.isFinite(volume)) return
+    sendPlayerCommand({ action: 'set-volume', volume })
+  }
+
+  function handleDragStart(event: PointerEvent) {
+    if (event.button !== 0 || !event.isPrimary) return
+    if (isRangeControlTarget(event.target)) return
     const rect = miniRef.current?.getBoundingClientRect()
     if (!rect) return
-    event.preventDefault()
+    setIsDragPointerActive(true)
     setIsMinimizePreview(false)
     dragRef.current = {
       startX: event.clientX,
@@ -565,6 +752,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
 
     drag.moved = drag.moved || Math.abs(event.clientX - drag.startX) > 3 || Math.abs(event.clientY - drag.startY) > 3
     if (!drag.moved) return
+    event.preventDefault()
     const minX = 12
     const maxX = Math.max(minX, window.innerWidth - drag.width - 12)
     const maxY = Math.max(12, window.innerHeight - drag.height - 12)
@@ -573,28 +761,31 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
       x: clampNumber(event.clientX - drag.offsetX, minX, maxX),
       y: nextTop
     })
-    setIsMinimizePreview(isMinimizeGesture(event, drag.startY))
+    setIsMinimizePreview(isMinimizeGesture(event, drag))
   }
 
   function handleDragEnd(event: PointerEvent) {
     const drag = dragRef.current
     dragRef.current = null
+    setIsDragPointerActive(false)
     if (!drag?.moved) {
       setIsMinimizePreview(false)
-      if (videoId) navigate(`/watch/${videoId}`)
       return
     }
-    if (isMinimizeGesture(event, drag.startY)) {
+    lastDragEndAtRef.current = performance.now()
+    if (isMinimizeGesture(event, drag)) {
       setIsMinimized(true)
       setMiniPosition(null)
     }
     setIsMinimizePreview(false)
   }
 
-  function handleRestoreDragStart(event: ReactPointerEvent<HTMLButtonElement>) {
-    event.preventDefault()
-    const width = Math.min(420, window.innerWidth - 40)
-    const height = window.innerWidth <= 640 ? 236 : 272
+  function handleRestoreDragStart(event: PointerEvent) {
+    if (event.button !== 0 || !event.isPrimary) return
+    if (isRangeControlTarget(event.target)) return
+    setIsDragPointerActive(true)
+    const width = window.innerWidth <= 680 ? window.innerWidth - 24 : Math.min(480, window.innerWidth - 40)
+    const height = width * 9 / 16 + 52
     const minX = 12
     const maxX = Math.max(minX, window.innerWidth - width - 12)
     const maxY = Math.max(12, window.innerHeight - height - 12)
@@ -627,6 +818,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
     if (!drag) return
     drag.moved = drag.moved || Math.abs(event.clientX - drag.startX) > 3 || Math.abs(event.clientY - drag.startY) > 3
     if (!drag.moved) return
+    event.preventDefault()
 
     const minX = 12
     const maxX = Math.max(minX, window.innerWidth - drag.width - 12)
@@ -644,11 +836,12 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
   function handleRestoreDragEnd(event: PointerEvent) {
     const drag = restoreDragRef.current
     restoreDragRef.current = null
+    setIsDragPointerActive(false)
     if (!drag?.moved) {
       setIsRestorePreview(false)
-      if (videoId) navigate(`/watch/${videoId}`)
       return
     }
+    lastDragEndAtRef.current = performance.now()
 
     const minX = 12
     const maxX = Math.max(minX, window.innerWidth - drag.width - 12)
@@ -665,53 +858,94 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
     setIsRestorePreview(false)
   }
 
-  if (videoId === null || isWatchRoute) return null
+  useEffect(() => {
+    const miniSurface = miniRef.current
+    const minimizedSurface = minimizedBarRef.current
+    if (!miniSurface && !minimizedSurface) return
+
+    // The video is portaled into the mini slot, so listen on the real DOM
+    // surface to receive pointer events from the video as well as its header.
+    const handleMiniPointerDown = (event: PointerEvent) => handleDragStart(event)
+    const handleMinimizedPointerDown = (event: PointerEvent) => handleRestoreDragStart(event)
+    miniSurface?.addEventListener('pointerdown', handleMiniPointerDown)
+    minimizedSurface?.addEventListener('pointerdown', handleMinimizedPointerDown)
+
+    return () => {
+      miniSurface?.removeEventListener('pointerdown', handleMiniPointerDown)
+      minimizedSurface?.removeEventListener('pointerdown', handleMinimizedPointerDown)
+    }
+  }, [videoId, isMinimized])
+
+  if (videoId === null || isWatchRoute || shorts.length > 0) return null
 
   const showBar = (isMinimized || isMinimizePreview) && !isRestorePreview
   const hideMini = (isMinimized || isMinimizePreview) && !isRestorePreview
+  const dragCursorClass = isDragPointerActive
+    ? 'cursor-grabbing [&_[role=button]]:cursor-grabbing [&_button]:cursor-grabbing'
+    : 'cursor-grab [&_[role=button]]:cursor-pointer [&_button]:cursor-pointer'
+  const hasTimeline = Number.isFinite(playerState.duration) && playerState.duration > 0
+  const timelineValue = hasTimeline ? clampNumber(playerState.currentTime, 0, playerState.duration) : 0
+  const volumeValue = clampNumber(playerState.volume, 0, 1)
+  const timelineRangeStyle = { '--wt-range-progress': `${hasTimeline ? (timelineValue / playerState.duration) * 100 : 0}%` } as CSSProperties
+  const volumeRangeStyle = { '--wt-range-progress': `${volumeValue * 100}%` } as CSSProperties
 
   return (
     <>
       {showBar && (
       <aside
+        ref={minimizedBarRef}
+        onClickCapture={handleDraggedClickCapture}
         className={[
-          'fixed bottom-0 right-0 z-50 border-t border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity max-[680px]:bottom-[60px] max-[680px]:left-0',
+          'fixed bottom-0 right-0 z-50 touch-none select-none border-t border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity max-[680px]:bottom-[60px] max-[680px]:left-0',
+          dragCursorClass,
           isMinimizePreview && !isMinimized ? 'pointer-events-none opacity-45' : 'opacity-100',
           isSideNavOpen ? 'min-[681px]:left-[200px]' : 'min-[681px]:left-20'
         ].join(' ')}
       >
-        <div className="flex min-h-[52px] min-w-0 items-center gap-3 px-4">
+        <div className="grid min-h-[58px] min-w-0 grid-cols-[minmax(120px,1fr)_minmax(220px,520px)_auto] items-center gap-4 px-4 max-[840px]:grid-cols-[minmax(0,1fr)_auto]">
           <button
             type="button"
-            onPointerDown={handleRestoreDragStart}
-            aria-label="Arrastrar para restaurar mini reproductor"
-            title="Arrastrar para restaurar mini reproductor"
-            className="flex min-w-0 flex-1 cursor-grab touch-none items-center gap-2 text-left active:cursor-grabbing"
+            onClick={() => navigate(`/watch/${videoId}`)}
+            className="min-w-0 cursor-pointer text-left"
+            data-player-control="true"
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-neutral-800 text-neutral-400">
-              <Icon name="menu" className="h-4 w-4" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium">{title}</span>
-              <span className="block truncate text-xs text-neutral-400">{channelName}</span>
-            </span>
+            <span className="block truncate text-sm font-medium">{title}</span>
+            <span className="block truncate text-xs text-neutral-400">{channelName}</span>
           </button>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex min-w-0 items-center justify-center gap-2 max-[840px]:hidden" data-player-control="true">
+            <span className="w-11 text-right text-xs tabular-nums text-neutral-500">{formatMediaTime(playerState.currentTime)}</span>
+            <input
+              type="range"
+              min={0}
+              max={hasTimeline ? playerState.duration : 0}
+              step={0.1}
+              value={timelineValue}
+              onChange={handleTimelineChange}
+              disabled={!hasTimeline}
+              aria-label="Buscar en reproducción"
+              className="wt-media-range min-w-0 flex-1 cursor-pointer disabled:cursor-default disabled:opacity-50"
+              style={timelineRangeStyle}
+            />
+            <span className="w-11 text-xs tabular-nums text-neutral-500">{formatMediaTime(playerState.duration)}</span>
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-1">
             <button
               type="button"
               onClick={() => sendPlayerCommand({ action: 'seek-relative', seconds: -10 })}
               aria-label="Retroceder 10 segundos"
               title="Retroceder 10 segundos"
-              className="grid h-9 w-9 place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
             >
-              <Icon name="rewind" className="h-4 w-4" />
+              <Icon name="replay10" className="h-5 w-5" />
             </button>
             <button
               type="button"
               onClick={() => sendPlayerCommand({ action: 'toggle-play' })}
               aria-label={playerState.paused ? 'Reproducir' : 'Pausar'}
               title={playerState.paused ? 'Reproducir' : 'Pausar'}
-              className="grid h-9 w-9 place-items-center rounded bg-neutral-100 text-neutral-950 hover:bg-white"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded bg-neutral-100 text-neutral-950 hover:bg-white"
+              data-player-control="true"
             >
               <Icon name={playerState.paused ? 'play' : 'pause'} className="h-4 w-4" />
             </button>
@@ -720,37 +954,51 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
               onClick={() => sendPlayerCommand({ action: 'seek-relative', seconds: 10 })}
               aria-label="Avanzar 10 segundos"
               title="Avanzar 10 segundos"
-              className="grid h-9 w-9 place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
             >
-              <Icon name="forward" className="h-4 w-4" />
+              <Icon name="forward10" className="h-5 w-5" />
+            </button>
+            <div className="ml-2 flex w-28 items-center gap-2 max-[980px]:hidden" data-player-control="true">
+              <Icon name="volume" className="h-4 w-4 text-neutral-500" />
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volumeValue}
+                onChange={handleVolumeChange}
+                aria-label="Volumen"
+                className="wt-media-range min-w-0 flex-1 cursor-pointer"
+                style={volumeRangeStyle}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMinimized(false)
+                setIsMinimizePreview(false)
+                setIsRestorePreview(false)
+                setMiniPosition(null)
+              }}
+              aria-label="Restaurar mini reproductor"
+              title="Restaurar mini reproductor"
+              className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
+            >
+              <Icon name="arrowUpRight" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={closePlayer}
+              aria-label="Cerrar reproductor"
+              title="Cerrar reproductor"
+              className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
+            >
+              <Icon name="x" className="h-4 w-4" />
             </button>
           </div>
-          <p className="hidden min-w-[86px] text-right text-xs text-neutral-500 sm:block">
-            {formatMediaTime(playerState.currentTime)} / {formatMediaTime(playerState.duration)}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setIsMinimized(false)
-              setIsMinimizePreview(false)
-              setIsRestorePreview(false)
-              setMiniPosition(null)
-            }}
-            aria-label="Restaurar mini reproductor"
-            title="Restaurar mini reproductor"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
-          >
-            <Icon name="arrowUpRight" className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={closePlayer}
-            aria-label="Cerrar reproductor"
-            title="Cerrar reproductor"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
-          >
-            <Icon name="x" className="h-4 w-4" />
-          </button>
         </div>
       </aside>
       )}
@@ -759,7 +1007,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
         ref={miniRef}
         aria-hidden={hideMini}
         className={[
-          'fixed z-50 w-[min(420px,calc(100vw-40px))] max-[680px]:w-[calc(100vw-24px)]',
+          'fixed z-50 w-[min(480px,calc(100vw-40px))] max-[680px]:w-[calc(100vw-24px)]',
           hideMini
             ? 'pointer-events-none -left-[9999px] top-0 opacity-0'
             : miniPosition
@@ -769,38 +1017,50 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
         style={!hideMini && miniPosition ? { left: miniPosition.x, top: miniPosition.y } : undefined}
       >
         <aside
+          onClickCapture={handleDraggedClickCapture}
           className={[
-            'grid grid-cols-[1fr_auto] overflow-hidden rounded-lg border bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity',
+            'grid touch-none select-none grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity',
+            dragCursorClass,
             isMinimizePreview ? 'border-neutral-100/60 opacity-35 ring-2 ring-neutral-100/20' : 'border-neutral-800 opacity-100'
           ].join(' ')}
         >
           <button
             type="button"
-            onPointerDown={handleDragStart}
-            aria-label="Mover mini reproductor"
-            title="Mover mini reproductor"
-            className="flex min-w-0 cursor-grab touch-none items-center gap-2 px-3 py-2 text-left active:cursor-grabbing"
+            onClick={() => navigate(`/watch/${videoId}`)}
+            className="min-w-0 cursor-pointer px-3 py-2 text-left"
+            data-player-control="true"
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-neutral-800 text-neutral-400">
-              <Icon name="menu" className="h-4 w-4" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium">{title}</span>
-              <span className="block truncate text-xs text-neutral-400">{channelName}</span>
-            </span>
+            <span className="block truncate text-sm font-medium">{title}</span>
+            <span className="block truncate text-xs text-neutral-400">{channelName}</span>
           </button>
           <div className="flex items-center pr-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMinimized(true)
+                setIsMinimizePreview(false)
+                setIsRestorePreview(false)
+                setMiniPosition(null)
+              }}
+              aria-label="Minimizar reproductor"
+              title="Minimizar reproductor"
+              className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
+            >
+              <Icon name="arrowDownRight" className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={closePlayer}
               aria-label="Cerrar reproductor"
               title="Cerrar reproductor"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
             >
               <Icon name="x" className="h-4 w-4" />
             </button>
           </div>
-          <div id={MINI_SLOT_ID} className="col-span-2 h-[236px] w-full bg-black max-[640px]:h-[200px]" />
+          <div id={MINI_SLOT_ID} className="col-span-2 aspect-video w-full bg-black" />
         </aside>
       </div>
     </>
@@ -843,6 +1103,7 @@ export default function App() {
           </div>
           <GlobalPlayerHost />
           <MiniPlayer isSideNavOpen={isSideNavOpen} />
+          <ShortsModal />
         </div>
       </GlobalPlayerProvider>
     </ProfileProvider>

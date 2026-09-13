@@ -6,6 +6,7 @@ import type {
   CreateLocalUserRequest,
   DeleteLocalUserRequest,
   CreateProfileRequest,
+  CreateSavedPlaylistRequest,
   HistoryEntry,
   LocalSessionState,
   LocalUser,
@@ -13,6 +14,8 @@ import type {
   ProfilesState,
   SavedPlaylist,
   SavedVideo,
+  SaveVideoRequest,
+  SearchHistoryEntry,
   Subscription,
   UpdateProfileRequest,
   UserProfile
@@ -20,6 +23,7 @@ import type {
 
 const DB_VERSION = 1
 const MAX_HISTORY_ENTRIES = 300
+const MAX_SEARCH_HISTORY_ENTRIES = 50
 const PASSWORD_ITERATIONS = 210_000
 const PROFILE_COLORS = ['#dc2626', '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#0891b2', '#db2777', '#525252']
 
@@ -41,6 +45,7 @@ interface LocalDb {
   subscriptions: Record<string, Subscription[]>
   savedPlaylists: Record<string, SavedPlaylist[]>
   savedVideos: Record<string, SavedVideo[]>
+  searchHistories: Record<string, SearchHistoryEntry[]>
   settings: Record<string, unknown>
 }
 
@@ -100,6 +105,7 @@ function emptyDb(): LocalDb {
     subscriptions: {},
     savedPlaylists: {},
     savedVideos: {},
+    searchHistories: {},
     settings: {}
   }
 }
@@ -201,6 +207,7 @@ async function migrateLegacyData(): Promise<LocalDb> {
     db.subscriptions[profile.id] =
       (await readJson<Subscription[]>(legacyProfileDataPath(profile.id, 'subscriptions.json'))) ??
       (profile.id === activeProfileId ? legacySubscriptions ?? [] : [])
+    db.searchHistories[profile.id] = []
   }
 
   return db
@@ -256,6 +263,10 @@ function normalizeDb(raw: unknown): LocalDb {
   db.savedPlaylists =
     typeof value.savedPlaylists === 'object' && value.savedPlaylists !== null ? (value.savedPlaylists as Record<string, SavedPlaylist[]>) : {}
   db.savedVideos = typeof value.savedVideos === 'object' && value.savedVideos !== null ? (value.savedVideos as Record<string, SavedVideo[]>) : {}
+  db.searchHistories =
+    typeof value.searchHistories === 'object' && value.searchHistories !== null
+      ? (value.searchHistories as Record<string, SearchHistoryEntry[]>)
+      : {}
   db.settings = typeof value.settings === 'object' && value.settings !== null ? (value.settings as Record<string, unknown>) : {}
 
   const activeUserId =
@@ -385,6 +396,20 @@ function toProfilesState(db: LocalDb): ProfilesState {
   }
 }
 
+export async function getPlayerAudioPreferences(): Promise<import('../shared/ipc').PlayerAudioPreferences> {
+  const db = await loadDb()
+  const audio = db.settings.playerAudio as { volume?: unknown; muted?: unknown } | undefined
+  return { volume: typeof audio?.volume === 'number' && Number.isFinite(audio.volume) ? Math.min(1, Math.max(0, audio.volume)) : 1,
+    muted: audio?.muted === true }
+}
+
+export async function setPlayerAudioPreferences(audio: import('../shared/ipc').PlayerAudioPreferences): Promise<void> {
+  if (!Number.isFinite(audio.volume) || typeof audio.muted !== 'boolean') throw new Error('Volumen invalido')
+  const db = await loadDb()
+  db.settings.playerAudio = { volume: Math.min(1, Math.max(0, audio.volume)), muted: audio.muted }
+  await persistDb(db)
+}
+
 export async function getSessionState(): Promise<LocalSessionState> {
   return toSessionState(await loadDb())
 }
@@ -438,6 +463,7 @@ export async function deleteLocalUser(request: DeleteLocalUserRequest): Promise<
     delete db.subscriptions[profileId]
     delete db.savedPlaylists[profileId]
     delete db.savedVideos[profileId]
+    delete db.searchHistories[profileId]
   }
 
   if (db.session.activeUserId === user.id) {
@@ -515,6 +541,7 @@ export async function removeUserProfile(profileId: string): Promise<ProfilesStat
   delete db.subscriptions[profileId]
   delete db.savedPlaylists[profileId]
   delete db.savedVideos[profileId]
+  delete db.searchHistories[profileId]
   if (db.session.activeProfileIdByUser[user.id] === profileId) {
     const nextProfile = getProfilesForUser(db, user.id)[0]
     if (nextProfile) db.session.activeProfileIdByUser[user.id] = nextProfile.id
@@ -552,10 +579,108 @@ export async function listActiveSavedPlaylists(): Promise<SavedPlaylist[]> {
   return [...(db.savedPlaylists[profile.id] ?? [])].sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
-export async function listActiveSavedVideos(): Promise<SavedVideo[]> {
+export async function createActiveSavedPlaylist(request: CreateSavedPlaylistRequest): Promise<SavedPlaylist> {
   const db = await loadDb()
   const profile = requireActiveProfile(db)
-  return [...(db.savedVideos[profile.id] ?? [])].sort((a, b) => b.savedAt - a.savedAt)
+  const name = normalizeName(request.name)
+  if (!name) throw new Error('El nombre de la playlist no puede estar vacio.')
+
+  const entries = db.savedPlaylists[profile.id] ?? []
+  const existing = entries.find((playlist) => playlist.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0)
+  if (existing) return existing
+
+  const timestamp = now()
+  const playlist: SavedPlaylist = {
+    id: `playlist-${randomUUID()}`,
+    profileId: profile.id,
+    name,
+    description: request.description?.trim() || null,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }
+  db.savedPlaylists[profile.id] = [playlist, ...entries]
+  await persistDb(db)
+  return playlist
+}
+
+export async function listActiveSavedVideos(playlistId?: string | null): Promise<SavedVideo[]> {
+  const db = await loadDb()
+  const profile = requireActiveProfile(db)
+  const entries = db.savedVideos[profile.id] ?? []
+  const filtered = playlistId === undefined ? entries : entries.filter((video) => (video.playlistId ?? null) === playlistId)
+  return [...filtered].sort((a, b) => b.savedAt - a.savedAt)
+}
+
+export async function saveActiveVideo(request: SaveVideoRequest): Promise<SavedVideo> {
+  const db = await loadDb()
+  const profile = requireActiveProfile(db)
+  const title = normalizeName(request.title)
+  if (!request.videoId || !title) throw new Error('No se puede guardar un video sin titulo.')
+
+  const playlistId = request.playlistId ?? null
+  if (playlistId && !(db.savedPlaylists[profile.id] ?? []).some((playlist) => playlist.id === playlistId)) {
+    throw new Error('Playlist no encontrada.')
+  }
+
+  const entries = db.savedVideos[profile.id] ?? []
+  const existing = entries.find((video) => video.videoId === request.videoId && (video.playlistId ?? null) === playlistId)
+  const timestamp = now()
+  const savedVideo: SavedVideo = {
+    id: existing?.id ?? `saved-video-${randomUUID()}`,
+    profileId: profile.id,
+    videoId: request.videoId,
+    title,
+    channelId: request.channelId,
+    channelName: normalizeName(request.channelName) || '(desconocido)',
+    thumbnailUrl: request.thumbnailUrl,
+    playlistId,
+    savedAt: timestamp
+  }
+
+  db.savedVideos[profile.id] = [...entries.filter((video) => video.id !== savedVideo.id), savedVideo]
+
+  if (playlistId) {
+    db.savedPlaylists[profile.id] = (db.savedPlaylists[profile.id] ?? []).map((playlist) =>
+      playlist.id === playlistId ? { ...playlist, updatedAt: timestamp } : playlist
+    )
+  }
+
+  await persistDb(db)
+  return savedVideo
+}
+
+export async function removeActiveSavedVideo(videoId: string, playlistId?: string | null): Promise<void> {
+  const db = await loadDb()
+  const profile = requireActiveProfile(db)
+  const targetPlaylistId = playlistId ?? null
+  db.savedVideos[profile.id] = (db.savedVideos[profile.id] ?? []).filter((video) => {
+    return !(video.videoId === videoId && (video.playlistId ?? null) === targetPlaylistId)
+  })
+  await persistDb(db)
+}
+
+export async function listActiveSearchHistory(): Promise<SearchHistoryEntry[]> {
+  const db = await loadDb()
+  const profile = requireActiveProfile(db)
+  return [...(db.searchHistories[profile.id] ?? [])].sort((a, b) => b.searchedAt - a.searchedAt)
+}
+
+export async function recordActiveSearchQuery(query: string): Promise<SearchHistoryEntry[]> {
+  const db = await loadDb()
+  const profile = requireActiveProfile(db)
+  const normalizedQuery = normalizeName(query)
+  if (!normalizedQuery) return db.searchHistories[profile.id] ?? []
+
+  const lowerQuery = normalizedQuery.toLocaleLowerCase()
+  const entries = db.searchHistories[profile.id] ?? []
+  const nextEntries = [
+    { query: normalizedQuery, searchedAt: now() },
+    ...entries.filter((entry) => entry.query.toLocaleLowerCase() !== lowerQuery)
+  ].slice(0, MAX_SEARCH_HISTORY_ENTRIES)
+
+  db.searchHistories[profile.id] = nextEntries
+  await persistDb(db)
+  return nextEntries
 }
 
 export async function listActiveSubscriptions(): Promise<Subscription[]> {

@@ -72,9 +72,11 @@ export class ShakaSabrPlayerAdapter implements SabrPlayerAdapter {
     const isVideo = Boolean(currentFormat.width)
     const bestOf = (formats: GVSabrFormat[]): GVSabrFormat | undefined =>
       formats.length ? formats.reduce((best, f) => (f.bitrate > best.bitrate ? f : best)) : undefined
+    const audioFormats = sabrFormats.filter((format) => !format.width)
+    const originalAudio = audioFormats.filter((format) => format.isOriginal)
 
     return {
-      audioFormat: isVideo ? bestOf(sabrFormats.filter((f) => !f.width)) : currentFormat,
+      audioFormat: isVideo ? bestOf(originalAudio.length ? originalAudio : audioFormats) : currentFormat,
       videoFormat: isVideo ? currentFormat : bestOf(sabrFormats.filter((f) => f.width))
     }
   }

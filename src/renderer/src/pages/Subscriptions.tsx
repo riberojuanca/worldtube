@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ChannelAvatar } from '../components/ChannelAvatar'
 import { VideoCard } from '../components/VideoCard'
 import { useProfiles } from '../profiles/ProfileContext'
 import type { SearchResultItem, Subscription } from '../../../shared/ipc'
@@ -60,7 +61,7 @@ export function Subscriptions() {
             to={`/channel/${sub.channelId}`}
             className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 hover:bg-neutral-900"
           >
-            {sub.thumbnailUrl && <img src={sub.thumbnailUrl} alt="" className="h-8 w-8 rounded-full object-cover" />}
+            <ChannelAvatar name={sub.channelName} thumbnailUrl={sub.thumbnailUrl} />
             <span className="text-sm font-medium">{sub.channelName}</span>
           </Link>
         ))}

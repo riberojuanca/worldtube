@@ -74,7 +74,7 @@ function getLockupPrimaryThumbnail(lockup: LockupView): ThumbnailViewLike | null
   return null
 }
 
-function getLockupThumbnailUrl(lockup: LockupView): string | null {
+export function getLockupThumbnailUrl(lockup: LockupView): string | null {
   return getLockupPrimaryThumbnail(lockup)?.image?.at(-1)?.url ?? null
 }
 
@@ -143,7 +143,11 @@ function mapLockupView(lockup: LockupView, fallbackChannelId: string | null = nu
  * shape. Watch-next has a wider mapper below because YouTube increasingly
  * returns recommendations as LockupView nodes.
  */
-function mapVideoNodes(nodes: readonly VideoOrGridVideo[], fallbackChannelId: string | null = null): SearchResultItem[] {
+function mapVideoNodes(
+  nodes: readonly VideoOrGridVideo[],
+  fallbackChannelId: string | null = null,
+  fallbackChannelName = '(desconocido)'
+): SearchResultItem[] {
   // Video and CompactVideo share the same shape here (a `.duration` getter
   // returning `{ text }`, a non-nullable `.best_thumbnail`, and `.view_count`)
   // — only GridVideo differs (plain `.duration` Text, `.views` instead of
@@ -155,7 +159,7 @@ function mapVideoNodes(nodes: readonly VideoOrGridVideo[], fallbackChannelId: st
       videoId: isCompactMovie ? video.id : video.video_id,
       title: video.title.toString(),
       channelId: video.author?.id ?? fallbackChannelId,
-      channelName: video.author?.name ?? '(desconocido)',
+      channelName: video.author?.name ?? fallbackChannelName,
       thumbnailUrl: (isGridVideo || isCompactMovie ? video.thumbnails?.at(-1)?.url : video.best_thumbnail?.url) ?? null,
       durationText: (isGridVideo ? video.duration?.toString() : video.duration.text) ?? null,
       viewCountText:
@@ -167,7 +171,11 @@ function mapVideoNodes(nodes: readonly VideoOrGridVideo[], fallbackChannelId: st
   })
 }
 
-function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
+export function mapSearchResultNodes(
+  nodes: readonly unknown[],
+  fallbackChannelId: string | null = null,
+  fallbackChannelName = '(desconocido)'
+): SearchResultItem[] {
   const videos: SearchResultItem[] = []
 
   for (const item of nodes) {
@@ -177,17 +185,21 @@ function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
       item instanceof YTNodes.CompactVideo ||
       item instanceof YTNodes.CompactMovie
     ) {
-      videos.push(...mapVideoNodes([item]))
+      videos.push(...mapVideoNodes([item], fallbackChannelId, fallbackChannelName))
       continue
     }
 
     if (item instanceof YTNodes.LockupView) {
-      const mapped = mapLockupView(item)
+      const mapped = mapLockupView(item, fallbackChannelId, fallbackChannelName)
       if (mapped) videos.push(mapped)
     }
   }
 
   return videos
+}
+
+function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
+  return mapSearchResultNodes(nodes)
 }
 
 // See jsEvaluator.ts — without this, deciphering (server_abr_streaming_url,
@@ -198,13 +210,27 @@ function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
 
 let clientPromise: Promise<Innertube> | null = null
 
-function getClient(): Promise<Innertube> {
+export function getClient(): Promise<Innertube> {
   // retrieve_player: without the JS player, youtubei.js can't decipher
   // signature-ciphered format URLs at all ("Deciphering formats is not
   // possible without the JS player" per its own types) — that's exactly
   // what toDash() needs and was missing.
   clientPromise ??= Innertube.create({ generate_session_locally: true, retrieve_player: true })
   return clientPromise
+}
+
+const channelCache = new Map<string, { promise: Promise<Awaited<ReturnType<Innertube['getChannel']>>>; expiresAt: number }>()
+
+export function getBrowseChannel(channelId: string): Promise<Awaited<ReturnType<Innertube['getChannel']>>> {
+  const cached = channelCache.get(channelId)
+  if (cached && cached.expiresAt > Date.now()) return cached.promise
+  const promise = getClient().then((yt) => yt.getChannel(channelId)).catch((error) => {
+    channelCache.delete(channelId)
+    throw error
+  })
+  channelCache.set(channelId, { promise, expiresAt: Date.now() + 5 * 60 * 1000 })
+  while (channelCache.size > 30) channelCache.delete(channelCache.keys().next().value!)
+  return promise
 }
 
 // Keyed by videoId so concurrent requests for the same video share one
@@ -233,7 +259,16 @@ export async function searchVideos(query: string): Promise<SearchResultItem[]> {
   console.log(`[youtube] searchVideos(${query})`)
   const yt = await getClient()
   const results = await yt.search(query, { type: 'video' })
-  return mapVideoNodes(results.results.filterType(YTNodes.Video, YTNodes.GridVideo))
+  return mapSearchResultNodes(results.results.filterType(YTNodes.Video, YTNodes.GridVideo, YTNodes.LockupView))
+}
+
+export async function getSearchSuggestions(query: string): Promise<string[]> {
+  const cleanQuery = query.trim()
+  if (!cleanQuery) return []
+
+  const yt = await getClient()
+  const suggestions = await yt.getSearchSuggestions(cleanQuery)
+  return Array.isArray(suggestions) ? suggestions.filter((suggestion): suggestion is string => typeof suggestion === 'string') : []
 }
 
 export async function getHomeFeed(): Promise<SearchResultItem[]> {
@@ -241,30 +276,47 @@ export async function getHomeFeed(): Promise<SearchResultItem[]> {
   const yt = await getClient()
   const feed = await yt.getHomeFeed()
 
-  // Same caveat as getChannelInfo: only the Video/GridVideo layouts are
-  // mapped, so shelves rendered as LockupView won't show up here.
-  return mapVideoNodes(feed.videos.filterType(YTNodes.Video, YTNodes.GridVideo))
+  return mapSearchResultNodes(feed.videos.filterType(YTNodes.Video, YTNodes.GridVideo, YTNodes.LockupView))
 }
 
-export async function getChannelInfo(channelId: string): Promise<ChannelInfoResult> {
+export async function getChannelInfo(channelId: string, includeVideos = true): Promise<ChannelInfoResult> {
   console.log(`[youtube] getChannelInfo(${channelId})`)
-  const yt = await getClient()
-  const channel = await yt.getChannel(channelId)
-  const videosTab = channel.has_videos ? await channel.getVideos() : channel
-
-  // Channel video-tab layouts vary (Video/GridVideo cover the common ones);
-  // a channel rendered with the newer LockupView layout would come back
-  // empty here — narrower than search, but good enough for now.
-  const videos = mapVideoNodes(videosTab.videos.filterType(YTNodes.Video, YTNodes.GridVideo), channelId)
-
+  const channel = await getBrowseChannel(channelId)
+  const videosTab = includeVideos && channel.has_videos ? await channel.getVideos() : channel
   const header = channel.header as { author?: { id?: string; name?: string; best_thumbnail?: { url: string } }; subscribers?: { toString(): string } } | undefined
+  const resolvedChannelId = header?.author?.id ?? channel.metadata.external_id ?? channelId
+  const channelName = header?.author?.name ?? channel.metadata.title ?? '(desconocido)'
+  const pageHeader = channel.header instanceof YTNodes.PageHeader ? channel.header.content : null
+  const pageImage = pageHeader?.image
+  const pageAvatar = pageImage instanceof YTNodes.DecoratedAvatarView ? pageImage.avatar?.image?.at(-1)?.url
+    : pageImage instanceof YTNodes.ContentPreviewImageView ? pageImage.image.at(-1)?.url : null
+  const bannerUrl = pageHeader?.banner?.image.at(-1)?.url ??
+    (channel.header instanceof YTNodes.C4TabbedHeader ? channel.header.banner?.at(-1)?.url : null)
+  const metadataParts = pageHeader?.metadata?.metadata_rows.flatMap((row) => row.metadata_parts ?? []) ?? []
+
+  const videos = includeVideos ? mapSearchResultNodes(videosTab.videos.filterType(YTNodes.Video, YTNodes.GridVideo, YTNodes.LockupView), resolvedChannelId, channelName) : []
 
   return {
-    channelId: header?.author?.id ?? channel.metadata.external_id ?? channelId,
-    name: header?.author?.name ?? channel.metadata.title ?? '(desconocido)',
-    thumbnailUrl: header?.author?.best_thumbnail?.url ?? channel.metadata.avatar?.at(-1)?.url ?? null,
-    subscriberCountText: header?.subscribers?.toString() ?? null,
-    videos
+    channelId: resolvedChannelId,
+    name: channelName,
+    thumbnailUrl: pageAvatar ?? header?.author?.best_thumbnail?.url ?? channel.metadata.avatar?.at(-1)?.url ?? channel.metadata.thumbnail?.at(-1)?.url ?? null,
+    subscriberCountText: header?.subscribers?.toString() ?? metadataParts.map((part) => part.text?.toString()).find((text) => /subscribers|suscriptores/i.test(text ?? '')) ?? null,
+    videos,
+    description: channel.metadata.description ?? null,
+    bannerUrl: bannerUrl ?? null,
+    tabs: [
+      ...(channel.has_home ? ['home' as const] : []),
+      ...(channel.has_videos || channel.metadata.music_artist_name ? ['videos' as const] : []),
+      ...(channel.has_shorts ? ['shorts' as const] : []),
+      ...(channel.has_live_streams ? ['live' as const] : []),
+      ...(channel.has_playlists ? ['playlists' as const] : []),
+      ...(channel.has_podcasts ? ['podcasts' as const] : []),
+      ...(channel.has_releases ? ['releases' as const] : []),
+      ...(channel.has_courses ? ['courses' as const] : []),
+      ...(channel.has_community ? ['community' as const] : []),
+      'about',
+      ...(channel.has_search ? ['search' as const] : [])
+    ]
   }
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { VideoCard } from '../components/VideoCard'
 import { useProfiles } from '../profiles/ProfileContext'
+import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { SavedVideo } from '../../../shared/ipc'
 
 function formatSavedAt(timestampMs: number): string {
@@ -14,12 +15,19 @@ export function Saved() {
 
   useEffect(() => {
     let cancelled = false
-    setVideos(null)
-    window.api.listSavedVideos().then((items) => {
-      if (!cancelled) setVideos(items)
-    })
+    const loadVideos = () => {
+      setVideos(null)
+      window.api.listSavedVideos(null).then((items) => {
+        if (!cancelled) setVideos(items)
+      })
+    }
+
+    loadVideos()
+    window.addEventListener(PROFILE_DATA_CHANGED_EVENT, loadVideos)
+
     return () => {
       cancelled = true
+      window.removeEventListener(PROFILE_DATA_CHANGED_EVENT, loadVideos)
     }
   }, [activeProfileId])
 

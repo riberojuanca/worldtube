@@ -1,15 +1,22 @@
 import type {
   ChannelResponse,
+  PlayerAudioPreferences,
+  ChannelPageRequest,
+  ChannelPageResponse,
   CreateLocalUserRequest,
   DeleteLocalUserRequest,
   CreateProfileRequest,
+  CreateSavedPlaylistRequest,
   HistoryEntry,
   LocalSessionState,
   LoginLocalUserRequest,
   ProfilesState,
+  SaveVideoRequest,
   SavedPlaylist,
   SavedVideo,
+  SearchHistoryEntry,
   SearchResponse,
+  SearchSuggestionsResponse,
   Subscription,
   UpdateProfileRequest,
   VideoInfoResponse
@@ -18,9 +25,13 @@ import type {
 declare global {
   interface Window {
     api: {
+      getPlayerAudioPreferences: () => Promise<PlayerAudioPreferences>
+      setPlayerAudioPreferences: (audio: PlayerAudioPreferences) => Promise<void>
       getVideoInfo: (videoId: string) => Promise<VideoInfoResponse>
       search: (query: string) => Promise<SearchResponse>
+      getSearchSuggestions: (query: string) => Promise<SearchSuggestionsResponse>
       getChannel: (channelId: string) => Promise<ChannelResponse>
+      getChannelPage: (request: ChannelPageRequest) => Promise<ChannelPageResponse>
       getHomeFeed: () => Promise<SearchResponse>
       getSessionState: () => Promise<LocalSessionState>
       createLocalUser: (request: CreateLocalUserRequest) => Promise<LocalSessionState>
@@ -37,7 +48,12 @@ declare global {
       getHistory: () => Promise<HistoryEntry[]>
       clearHistory: () => Promise<void>
       listSavedPlaylists: () => Promise<SavedPlaylist[]>
-      listSavedVideos: () => Promise<SavedVideo[]>
+      createSavedPlaylist: (request: CreateSavedPlaylistRequest) => Promise<SavedPlaylist>
+      listSavedVideos: (playlistId?: string | null) => Promise<SavedVideo[]>
+      saveVideo: (request: SaveVideoRequest) => Promise<SavedVideo>
+      removeSavedVideo: (videoId: string, playlistId?: string | null) => Promise<void>
+      listSearchHistory: () => Promise<SearchHistoryEntry[]>
+      recordSearchQuery: (query: string) => Promise<SearchHistoryEntry[]>
       listSubscriptions: () => Promise<Subscription[]>
       getSubscriptionsFeed: () => Promise<SearchResponse>
       subscribe: (sub: Omit<Subscription, 'subscribedAt'>) => Promise<void>

@@ -51,6 +51,7 @@ async function loadThumbnailsTrack(player: shaka.Player, vtt: string | null): Pr
 
 export const WATCH_SLOT_ID = 'global-player-watch-slot'
 export const MINI_SLOT_ID = 'global-player-mini-slot'
+export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
 
 /**
  * Mounted ONCE, in App.tsx. One <video>, one shaka.Player, for the whole
@@ -67,13 +68,14 @@ export const MINI_SLOT_ID = 'global-player-mini-slot'
  * the element (and the shaka.Player attached to it) never unmounts.
  */
 export function GlobalPlayerHost() {
-  const { videoId, dashManifest, sabr, title, captions, storyboardVtt, playVideo } = useGlobalPlayer()
+  const { videoId, dashManifest, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status } = useGlobalPlayer()
   const location = useLocation()
   const isWatchRoute = location.pathname.startsWith('/watch/')
 
   const hiddenHomeRef = useRef<HTMLDivElement | null>(null)
   const playerRef = useRef<shaka.Player | null>(null)
   const uiRef = useRef<shaka.ui.Overlay | null>(null)
+  const fullControlPanelRef = useRef<string[]>([])
   const sabrSessionRef = useRef<SabrSession | null>(null)
   const portalMount = useMemo(() => {
     const element = document.createElement('div')
@@ -114,12 +116,13 @@ export function GlobalPlayerHost() {
     }
     const watchSlot = isWatchRoute ? document.getElementById(WATCH_SLOT_ID) : null
     const miniSlot = document.getElementById(MINI_SLOT_ID)
-    const slot = watchSlot || miniSlot
+    const shortSlot = shorts.length > 0 ? document.getElementById(SHORTS_SLOT_ID) : null
+    const slot = shortSlot || watchSlot || miniSlot
     console.log(
       `[player-slot] isWatchRoute=${isWatchRoute} watchSlotFound=${Boolean(watchSlot)} miniSlotFound=${Boolean(miniSlot)} -> using ${slot ? (slot.id || 'hidden-home') : 'hidden-home (no slot found!)'}`
     )
     movePortalMount(slot)
-  }, [isWatchRoute, videoId, location.pathname, portalMount])
+  }, [isWatchRoute, videoId, location.pathname, portalMount, shorts.length])
 
   useEffect(() => {
     return () => portalMount.remove()
@@ -139,6 +142,7 @@ export function GlobalPlayerHost() {
     let disposed = false
     const localPlayer = new shaka.Player()
     const ui = new shaka.ui.Overlay(localPlayer, containerEl, rawVideoEl)
+    fullControlPanelRef.current = [...ui.getConfiguration().controlPanelElements]
     const controls = ui.getControls()
     if (!controls) {
       ui.destroy().catch((error: unknown) => console.error(`shaka ui destroy failed: ${JSON.stringify(describeError(error))}`))
@@ -149,6 +153,7 @@ export function GlobalPlayerHost() {
       ui.destroy().catch((error: unknown) => console.error(`shaka ui destroy failed: ${JSON.stringify(describeError(error))}`))
       return
     }
+    player.configure({ preferredAudio: [{ role: 'main' }] })
 
     const handlePlayerError = (event: unknown) => {
       const rawError = (event as { detail?: unknown }).detail ?? event
@@ -168,10 +173,16 @@ export function GlobalPlayerHost() {
     player.addEventListener('error', handlePlayerError)
     rawVideoEl.addEventListener('error', handleVideoError)
 
-    localPlayer
-      .attach(rawVideoEl)
-      .then(() => {
-        if (!disposed) setVideoEl(rawVideoEl)
+    const audioPreferences = typeof window.api.getPlayerAudioPreferences === 'function'
+      ? window.api.getPlayerAudioPreferences().catch(() => null) : Promise.resolve(null)
+    Promise.all([localPlayer.attach(rawVideoEl), audioPreferences])
+      .then(([, audio]) => {
+        if (disposed) return
+        if (audio) {
+          rawVideoEl.volume = audio.volume
+          rawVideoEl.muted = audio.muted
+        }
+        setVideoEl(rawVideoEl)
       })
       .catch((error: unknown) => console.error(`shaka attach failed: ${JSON.stringify(describeError(error))}`))
 
@@ -187,6 +198,23 @@ export function GlobalPlayerHost() {
       ui.destroy().catch((error: unknown) => console.error(`shaka ui destroy failed: ${JSON.stringify(describeError(error))}`))
     }
   }, [rawVideoEl, containerEl])
+
+  useEffect(() => {
+    const ui = uiRef.current
+    if (!ui) return
+    ui.configure({ controlPanelElements: isWatchRoute && shorts.length === 0 ? fullControlPanelRef.current
+      : ['play_pause', 'mute', 'volume', 'time_and_duration', 'spacer', 'queue', 'overflow_menu', 'fullscreen'] })
+  }, [isWatchRoute, shorts.length, rawVideoEl, containerEl])
+
+  useEffect(() => {
+    if (!videoEl || typeof window.api.setPlayerAudioPreferences !== 'function') return
+    const saveAudio = () => {
+      void window.api.setPlayerAudioPreferences({ volume: videoEl.volume, muted: videoEl.muted })
+        .catch((error) => console.warn('No se pudo guardar el volumen', error))
+    }
+    videoEl.addEventListener('volumechange', saveAudio)
+    return () => videoEl.removeEventListener('volumechange', saveAudio)
+  }, [videoEl])
 
   useEffect(() => {
     const player = playerRef.current
@@ -232,6 +260,7 @@ export function GlobalPlayerHost() {
         .then(() => {
           console.log(`[timing] shaka load() (sabr) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
           void loadThumbnailsTrack(player, storyboardVtt)
+          if (shorts.length > 0) void videoEl.play().catch((error) => console.warn('Short autoplay failed', error))
           const pending = pendingResumeRef.current
           if (!pending || pending.videoId !== videoId) return
           pendingResumeRef.current = null
@@ -261,6 +290,7 @@ export function GlobalPlayerHost() {
       .then(() => {
         console.log(`[timing] shaka load() (dash) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
         void loadThumbnailsTrack(player, storyboardVtt)
+        if (shorts.length > 0) void videoEl.play().catch((error) => console.warn('Short autoplay failed', error))
       })
       .catch((error: unknown) => {
         const description = describeError(error)
@@ -284,13 +314,26 @@ export function GlobalPlayerHost() {
   }, [])
 
   useEffect(() => {
+    if (!videoEl || shorts.length === 0 || status !== 'ready') return
+    const onEnded = () => {
+      if (!videoEl.ended) return
+      const index = shorts.findIndex((short) => short.videoId === videoId)
+      const next = index >= 0 ? shorts[index + 1] : undefined
+      if (next) openShort(next.videoId, shorts)
+    }
+    videoEl.addEventListener('ended', onEnded)
+    return () => videoEl.removeEventListener('ended', onEnded)
+  }, [videoEl, shorts, videoId, status, openShort])
+
+  useEffect(() => {
     if (!videoEl) return
 
     const emitState = () => {
       const detail: PlayerStateDetail = {
         paused: videoEl.paused,
         currentTime: videoEl.currentTime || 0,
-        duration: Number.isFinite(videoEl.duration) ? videoEl.duration : 0
+        duration: Number.isFinite(videoEl.duration) ? videoEl.duration : 0,
+        volume: videoEl.muted ? 0 : videoEl.volume
       }
       window.dispatchEvent(new CustomEvent<PlayerStateDetail>(PLAYER_STATE_EVENT, { detail }))
     }
@@ -326,6 +369,22 @@ export function GlobalPlayerHost() {
         const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : Number.POSITIVE_INFINITY
         videoEl.currentTime = Math.min(Math.max(videoEl.currentTime + detail.seconds, 0), duration)
         emitState()
+        return
+      }
+
+      if (detail.action === 'seek-to') {
+        if (!Number.isFinite(detail.seconds)) return
+        const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : Number.POSITIVE_INFINITY
+        videoEl.currentTime = Math.min(Math.max(detail.seconds, 0), duration)
+        emitState()
+        return
+      }
+
+      if (detail.action === 'set-volume') {
+        const volume = Math.min(Math.max(detail.volume, 0), 1)
+        videoEl.volume = volume
+        videoEl.muted = volume === 0
+        emitState()
       }
     }
 
@@ -337,6 +396,7 @@ export function GlobalPlayerHost() {
     videoEl.addEventListener('pause', emitState)
     videoEl.addEventListener('play', emitState)
     videoEl.addEventListener('timeupdate', emitState)
+    videoEl.addEventListener('volumechange', emitState)
     emitState()
     return () => {
       window.removeEventListener(PLAYER_SEEK_EVENT, handleSeek)
@@ -347,6 +407,7 @@ export function GlobalPlayerHost() {
       videoEl.removeEventListener('pause', emitState)
       videoEl.removeEventListener('play', emitState)
       videoEl.removeEventListener('timeupdate', emitState)
+      videoEl.removeEventListener('volumechange', emitState)
     }
   }, [videoEl])
 

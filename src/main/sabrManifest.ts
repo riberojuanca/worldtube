@@ -32,6 +32,8 @@ export async function buildSabrPayload(
         language?: string | null
         audio_sample_rate?: number
         audio_channels?: number
+        is_original?: boolean
+        audio_track?: { audio_is_default?: boolean; display_name?: string }
         spatial_audio_type?: string
         color_info?: { primaries?: string; transfer_characteristics?: string }
         approx_duration_ms: number
@@ -87,6 +89,9 @@ export async function buildSabrPayload(
         language: format.language,
         audioSampleRate: format.audio_sample_rate,
         audioChannels: format.audio_channels,
+        isOriginal: format.is_original,
+        isDefault: format.audio_track?.audio_is_default,
+        audioLabel: format.audio_track?.display_name,
         spatialAudio: Boolean(format.spatial_audio_type),
         colorPrimaries: format.color_info?.primaries,
         colorTransferCharacteristics: format.color_info?.transfer_characteristics

@@ -12,3 +12,94 @@
 .shaka-video-container *::after {
   border-radius: var(--wt-radius) !important;
 }
+
+#global-player-mini-slot .shaka-content-title {
+  display: none !important;
+}
+
+#global-player-shorts-slot .shaka-content-title {
+  display: none !important;
+}
+
+.wt-short-enter-next { animation: wt-short-from-bottom 320ms ease-in-out both; }
+.wt-short-enter-previous { animation: wt-short-from-top 320ms ease-in-out both; }
+.wt-short-leave-next { animation: wt-short-to-top 320ms ease-in-out both; }
+.wt-short-leave-previous { animation: wt-short-to-bottom 320ms ease-in-out both; }
+
+@keyframes wt-short-from-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes wt-short-from-top {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes wt-short-to-top {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+
+@keyframes wt-short-to-bottom {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wt-short-enter-next, .wt-short-enter-previous,
+  .wt-short-leave-next, .wt-short-leave-previous {
+    animation-duration: 1ms;
+  }
+}
+
+:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-video-container {
+  container-type: inline-size;
+}
+
+:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-controls-button-panel {
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-controls-button-panel > .shaka-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-volume-bar-container {
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-volume-bar-container:is(:hover, :focus-within),
+:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-mute-button:hover + .shaka-volume-bar-container-allow-hiding {
+  width: clamp(24px, calc(100cqw - 280px), 100px) !important;
+  opacity: 1 !important;
+}
+
+@container (max-width: 500px) {
+  .shaka-controls-container {
+    --shaka-touch-size: 32px;
+  }
+
+  .shaka-controls-button-panel {
+    flex-wrap: nowrap;
+  }
+
+  .shaka-controls-button-panel > * {
+    flex-shrink: 0;
+  }
+}
+
+@container (max-width: 279px) {
+  .shaka-controls-button-panel {
+    flex-wrap: wrap;
+  }
+
+  .shaka-current-time {
+    order: 1;
+    flex-basis: 100%;
+    text-align: center;
+  }
+}

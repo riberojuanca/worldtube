@@ -3,8 +3,12 @@
 export const IPC_CHANNELS = {
   GET_VIDEO_INFO: 'youtube:get-video-info',
   SEARCH: 'youtube:search',
+  SEARCH_SUGGESTIONS: 'youtube:search-suggestions',
   GET_CHANNEL: 'youtube:get-channel',
+  CHANNEL_PAGE: 'youtube:channel-page',
   GET_HOME_FEED: 'youtube:get-home-feed',
+  PLAYER_AUDIO_GET: 'player:audio-get',
+  PLAYER_AUDIO_SET: 'player:audio-set',
   SESSION_GET_STATE: 'session:get-state',
   SESSION_CREATE_USER: 'session:create-user',
   SESSION_LOGIN: 'session:login',
@@ -20,7 +24,12 @@ export const IPC_CHANNELS = {
   HISTORY_LIST: 'history:list',
   HISTORY_CLEAR: 'history:clear',
   SAVED_PLAYLISTS_LIST: 'saved:playlists:list',
+  SAVED_PLAYLISTS_CREATE: 'saved:playlists:create',
   SAVED_VIDEOS_LIST: 'saved:videos:list',
+  SAVED_VIDEOS_SAVE: 'saved:videos:save',
+  SAVED_VIDEOS_REMOVE: 'saved:videos:remove',
+  SEARCH_HISTORY_LIST: 'search-history:list',
+  SEARCH_HISTORY_RECORD: 'search-history:record',
   SUBSCRIPTIONS_LIST: 'subscriptions:list',
   SUBSCRIPTIONS_FEED: 'subscriptions:feed',
   SUBSCRIPTIONS_ADD: 'subscriptions:add',
@@ -65,6 +74,25 @@ export interface SavedVideo {
   thumbnailUrl: string | null
   playlistId: string | null
   savedAt: number
+}
+
+export interface SaveVideoRequest {
+  videoId: string
+  title: string
+  channelId: string | null
+  channelName: string
+  thumbnailUrl: string | null
+  playlistId: string | null
+}
+
+export interface CreateSavedPlaylistRequest {
+  name: string
+  description?: string | null
+}
+
+export interface SearchHistoryEntry {
+  query: string
+  searchedAt: number
 }
 
 export interface LocalSessionState {
@@ -154,7 +182,14 @@ export interface SearchResultItem {
   publishedText: string | null
 }
 
+export interface PlayerAudioPreferences {
+  volume: number
+  muted: boolean
+}
+
 export type SearchResponse = { ok: true; data: SearchResultItem[] } | { ok: false; error: string }
+
+export type SearchSuggestionsResponse = { ok: true; data: string[] } | { ok: false; error: string }
 
 export interface ChannelInfoResult {
   channelId: string
@@ -162,7 +197,62 @@ export interface ChannelInfoResult {
   thumbnailUrl: string | null
   subscriberCountText: string | null
   videos: SearchResultItem[]
+  tabs?: ChannelTab[]
+  description?: string | null
+  bannerUrl?: string | null
 }
+
+export type ChannelTab = 'home' | 'videos' | 'shorts' | 'live' | 'playlists' | 'podcasts' | 'releases' | 'courses' | 'community' | 'about' | 'search'
+
+export interface ChannelPageRequest {
+  channelId: string
+  tab: ChannelTab
+  filter?: string
+  sort?: string
+  secondaryFilter?: string
+  contentType?: string
+  query?: string
+  continuation?: string
+  playlistId?: string
+}
+
+export interface ChannelPlaylistItem {
+  playlistId: string
+  title: string
+  thumbnailUrl: string | null
+  videoCountText: string | null
+}
+
+export interface ChannelPostItem {
+  id: string
+  text: string
+  publishedText: string | null
+  images: string[]
+  videos: SearchResultItem[]
+  playlists: ChannelPlaylistItem[]
+  pollChoices: string[]
+}
+
+export interface ChannelSection {
+  title: string
+  videos: SearchResultItem[]
+  playlists: ChannelPlaylistItem[]
+}
+
+export interface ChannelPageResult {
+  videos: SearchResultItem[]
+  playlists: ChannelPlaylistItem[]
+  posts: ChannelPostItem[]
+  sections: ChannelSection[]
+  filters: string[]
+  sorts: string[]
+  secondaryFilters: string[]
+  contentTypes: string[]
+  continuation: string | null
+  about: { description: string; details: string[]; links: { title: string; url: string }[] } | null
+}
+
+export type ChannelPageResponse = { ok: true; data: ChannelPageResult } | { ok: false; error: string }
 
 export type ChannelResponse = { ok: true; data: ChannelInfoResult } | { ok: false; error: string }
 
@@ -188,6 +278,9 @@ export interface SabrFormatInfo {
   language?: string | null
   audioSampleRate?: number
   audioChannels?: number
+  isOriginal?: boolean
+  isDefault?: boolean
+  audioLabel?: string
   spatialAudio: boolean
   colorPrimaries?: string
   colorTransferCharacteristics?: string

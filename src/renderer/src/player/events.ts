@@ -6,9 +6,12 @@ export type PlayerCommandDetail =
   | { action: 'sync' }
   | { action: 'toggle-play' }
   | { action: 'seek-relative'; seconds: number }
+  | { action: 'seek-to'; seconds: number }
+  | { action: 'set-volume'; volume: number }
 
 export interface PlayerStateDetail {
   paused: boolean
   currentTime: number
   duration: number
+  volume: number
 }

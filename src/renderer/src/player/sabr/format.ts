@@ -35,7 +35,8 @@ export function toGoogleVideoFormat(format: SabrFormatInfo): GVSabrFormat {
     mimeType: format.mimeType,
     bitrate: format.bitrate,
     approxDurationMs: 0,
-    language: format.language
+    language: format.language,
+    isOriginal: format.isOriginal
   }
 }
 
