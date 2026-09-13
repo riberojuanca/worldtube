@@ -42,6 +42,44 @@ Capa de datos (proceso principal, `src/main/`):
   en cada arranque).
 - `ipc.ts` (compartido): contrato tipado entre renderer y main.
 
+## Base visual acordada
+
+- Todos los radios visuales deben resolver a **3px**. `tailwind.config.ts` redefine todas las
+  variantes `rounded*` a 3px y `index.css` fuerza el mismo radio en controles/elementos externos
+  como la UI de Shaka.
+- La tipografía base no es Roboto. `index.css` registra Inter e Inter Tight desde
+  `src/renderer/src/assets/fonts/`; Inter queda como default y hay presets CSS para `sf`,
+  `inter` e `inter-tight`. No encontré archivos SF Pro reales en esta máquina durante la revisión:
+  el preset `sf` queda preparado como stack/fallback para cuando exista esa fuente instalada o se
+  copie un archivo SF al proyecto.
+- Shaka carga un `controls.css` local en `src/renderer/src/player/styles/`, sin la `@font-face`
+  remota de Roboto. `shaka-overrides.css` se importa después para forzar la fuente de WorldTube y
+  el radio único de 3px en sus controles.
+
+## Usuarios, sesión local y DB portable
+
+- La app no usa nube ni login externo. La base local portable vive en
+  `app.getPath('userData')/worldtube-data.json` y se maneja desde `src/main/localDb.ts`.
+- La DB local versionada contiene usuarios, hash/salt de contraseña opcional, sesión activa,
+  perfiles con foto/color, historial, suscripciones, playlists guardadas, videos guardados y un
+  bloque `settings` para preferencias futuras.
+- Primer arranque sin datos: el renderer muestra setup para crear un usuario local. Si hay usuarios
+  pero no sesión activa, muestra login local. El menú superior derecho muestra el perfil activo,
+  permite cambiarlo y editar nombre/foto/color.
+- La barra izquierda separa biblioteca y cuenta: Guardados (`/saved`) y Playlists (`/playlists`)
+  leen datos del perfil activo; Cuenta (`/account`) queda abajo y contiene usuarios locales,
+  perfiles del usuario, ruta/version de DB, export/import y cierre de sesión. `/profile` redirige a
+  `/saved` por compatibilidad.
+- Los stores `historyStore.ts` y `subscriptionsStore.ts` son wrappers sobre `localDb.ts`; ya no
+  escriben archivos paralelos. Historial y suscripciones quedan asociados al perfil activo.
+- Migración: si no existe `worldtube-data.json`, `localDb.ts` intenta importar los archivos viejos
+  `profiles.json`, `history.json`, `subscriptions.json` y `profiles/<id>/*.json` a un usuario local
+  inicial.
+- Renderer: `ProfileProvider` carga la sesión por IPC. `History`, `Subscriptions`, `Channel`,
+  `Watch` y el sidebar reaccionan al `activeProfileId`.
+- Evento renderer `worldtube:profile-data-changed`: tras suscribirse/desuscribirse o importar datos
+  se refresca el sidebar del perfil activo.
+
 ## Qué funciona, confirmado con un video real
 
 Pipeline completo de principal a fin, probado contra YouTube real (no mockeado):
@@ -173,6 +211,17 @@ mayoría venía como `LockupView`. Se corrigió copiando el criterio de FreeTube
 `CompactVideo`, `CompactMovie` y `LockupView` con `content_type === 'VIDEO' || 'STATION'`, filtrando
 members-only.
 
+## Watch fase 2: detalles, acciones y descripción (agregado 2026-09-12)
+
+La tarjeta de Watch ya muestra metadatos más completos desde `VideoInfoResult`: vistas, fecha,
+duración, categoría, likes disponibles, avatar del canal, contador de suscriptores si YouTube lo
+expone, botón de suscripción local y botón para copiar enlace. La suscripción sigue siendo local
+(`subscriptions.json`), igual que en `Channel.tsx`; no es login real de YouTube.
+
+La descripción ya es expandible/colapsable y detecta timestamps (`mm:ss` / `hh:mm:ss`). Al tocar
+un timestamp, `Watch.tsx` emite `PLAYER_SEEK_EVENT` (`src/renderer/src/player/events.ts`) y
+`GlobalPlayerHost.tsx` mueve el único `<video>` persistente sin recrear Shaka.
+
 ## Controles del player: shaka.ui.Overlay (agregado 2026-09-12, sesión de "el player es lento/distinto")
 
 Reemplazado el control bar hecho a mano (`PlayerControls.tsx`, ya borrado) por la **UI oficial de
@@ -192,6 +241,13 @@ Cambios:
   `ui.getControls().getPlayer()`, y recién después `attach(video)`. Además el portal usa un
   `portalMount` estable que se mueve con `appendChild`, para no remontar/destruir Shaka al pasar
   de Watch al mini.
+- **Mini player drag/minimize**: el mini se arrastra desde su encabezado. Un arrastre hacia abajo
+  mayor a `90px` lo minimiza a una barra inferior con controles; durante el gesto solo se ve la
+  barra translúcida y el slot del video queda montado fuera de pantalla para no cortar audio ni
+  recrear Shaka. La barra respeta el ancho del sidebar en desktop, tiene play/pausa y saltos por
+  eventos (`PLAYER_COMMAND_EVENT`/`PLAYER_STATE_EVENT`), se restaura al lugar ideal con la flecha
+  diagonal y también puede arrastrarse hacia arriba para volver a mini siguiendo el movimiento del
+  mouse. El click sin arrastre en el título vuelve a `/watch/:videoId`.
 - **Miniatura al hacer hover en la barra** (storyboard): `youtube.ts#buildStoryboardVtt` convierte
   `info.storyboards` (youtubei.js) al formato WebVTT de thumbnails (`url#xywh=x,y,w,h` por cue) y
   viaja en `VideoInfoResult.storyboardVtt`. `GlobalPlayerHost.tsx#loadThumbnailsTrack` lo pasa a
@@ -204,10 +260,8 @@ Cambios:
   shaka (`describeError`): antes `console.error('...', error)` llegaba a la consola de la terminal
   como `[object Object]` (el relay de `console-message` en `main/index.ts` solo expone
   `details.message`, un string) — ahora se arma un string explícito con `code`/`category`/`severity`/`data`.
-- **Pendiente/conocido**: el CSS de shaka (`controls.css`) pide la fuente Roboto de
-  `fonts.gstatic.com`, bloqueada por la CSP actual (`default-src 'self'`) — cae al fallback del
-  sistema, no rompe nada, pero si se quiere la tipografía real hay que permitir ese host en la CSP
-  o empaquetar la fuente localmente.
+- **Resuelto**: el CSS de shaka ahora se sirve localmente y se le quitó la `@font-face` remota de
+  Roboto. La CSP puede quedarse con `font-src 'self'`; las fuentes de la app viven dentro del repo.
 - El botón de CC de shaka lee `player.getTextTracks()` (pistas declaradas en el manifest), pero
   nuestros subtítulos son `<track>` nativos del `<video>` (fuera del manifest, ver sección de
   Captions más arriba). Si se quiere paridad total de CC, hay que decidir entre mover captions al
@@ -227,9 +281,9 @@ Cambios:
   mismo filtro de FreeTube Lab; falta extender home/canales/shelves si aparecen vacíos.
 - **Feed combinado de suscripciones**: hoy `Subscriptions.tsx` solo lista los canales guardados;
   no trae los videos recientes de esos canales a un feed único.
-- La página Watch todavía está en fase 1: layout y recomendados. Faltan detalles completos,
-  descripción, capítulos, comentarios, playlist, live chat/upcoming/premiere y preferencias para
-  ocultar secciones.
+- La página Watch ya tiene layout, recomendados, detalles y descripción expandible. Faltan
+  capítulos, comentarios, playlist, live chat/upcoming/premiere y preferencias para ocultar
+  secciones.
 
 ## Cómo correr
 
@@ -273,10 +327,8 @@ y volver a correrlo) — un restart limpio reconstruye todo desde cero.
 ## Próximo paso sugerido
 
 El trabajo grande (SABR reproduciendo) ya está, hay navegación básica y Watch quedó en fase 1
-(layout + recomendados). Lo que sigue:
+(layout + recomendados) más fase 2 (detalles + descripción). Lo que sigue:
 
-1. Paso 2 de Watch: card de detalles completa (vistas/fecha/likes/canal/acciones).
-2. Descripción expandible con timestamps.
-3. Capítulos.
-4. Comentarios, playlist/sidebar avanzada y live chat/upcoming.
-5. Probar seek, cambio de calidad manual y un video sin SABR.
+1. Capítulos.
+2. Comentarios, playlist/sidebar avanzada y live chat/upcoming.
+3. Probar formalmente seek, cambio de calidad manual y un video sin SABR.

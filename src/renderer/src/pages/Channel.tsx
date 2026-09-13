@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { VideoCard } from '../components/VideoCard'
+import { useProfiles } from '../profiles/ProfileContext'
+import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { ChannelInfoResult } from '../../../shared/ipc'
 
 type Status = 'loading' | 'ready' | 'error'
@@ -11,6 +13,7 @@ export function Channel() {
   const [channel, setChannel] = useState<ChannelInfoResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const { activeProfileId } = useProfiles()
 
   useEffect(() => {
     if (!channelId) return
@@ -32,7 +35,7 @@ export function Channel() {
     return () => {
       cancelled = true
     }
-  }, [channelId])
+  }, [activeProfileId, channelId])
 
   async function toggleSubscription() {
     if (!channel) return
@@ -46,6 +49,7 @@ export function Channel() {
       })
     }
     setIsSubscribed(!isSubscribed)
+    window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
   }
 
   if (status === 'loading') return <p className="text-sm text-neutral-400">Cargando canal…</p>

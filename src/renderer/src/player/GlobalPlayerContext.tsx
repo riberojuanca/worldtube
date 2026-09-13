@@ -6,6 +6,14 @@ export interface GlobalPlayerState {
   title: string
   channelId: string | null
   channelName: string
+  channelThumbnailUrl: string | null
+  subscriberCountText: string | null
+  durationText: string | null
+  viewCountText: string | null
+  likeCountText: string | null
+  publishedText: string | null
+  category: string | null
+  description: string | null
   captions: CaptionTrack[]
   storyboardVtt: string | null
   relatedVideos: SearchResultItem[]
@@ -25,6 +33,14 @@ const initialState: GlobalPlayerState = {
   title: '',
   channelId: null,
   channelName: '',
+  channelThumbnailUrl: null,
+  subscriberCountText: null,
+  durationText: null,
+  viewCountText: null,
+  likeCountText: null,
+  publishedText: null,
+  category: null,
+  description: null,
   captions: [],
   storyboardVtt: null,
   relatedVideos: [],
@@ -82,6 +98,14 @@ export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
         title: response.data.title,
         channelId: response.data.channelId,
         channelName: response.data.channelName,
+        channelThumbnailUrl: response.data.channelThumbnailUrl,
+        subscriberCountText: response.data.subscriberCountText,
+        durationText: response.data.durationText,
+        viewCountText: response.data.viewCountText,
+        likeCountText: response.data.likeCountText,
+        publishedText: response.data.publishedText,
+        category: response.data.category,
+        description: response.data.description,
         captions: response.data.captions,
         storyboardVtt: response.data.storyboardVtt,
         relatedVideos: response.data.relatedVideos,
@@ -98,6 +122,14 @@ export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
       title: response.data.title,
       channelId: response.data.channelId,
       channelName: response.data.channelName,
+      channelThumbnailUrl: response.data.channelThumbnailUrl,
+      subscriberCountText: response.data.subscriberCountText,
+      durationText: response.data.durationText,
+      viewCountText: response.data.viewCountText,
+      likeCountText: response.data.likeCountText,
+      publishedText: response.data.publishedText,
+      category: response.data.category,
+      description: response.data.description,
       captions: response.data.captions,
       storyboardVtt: response.data.storyboardVtt,
       relatedVideos: response.data.relatedVideos,

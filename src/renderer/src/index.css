@@ -2,10 +2,123 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'WorldTube Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/inter-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF,
+    U+0131,
+    U+0152-0153,
+    U+02BB-02BC,
+    U+02C6,
+    U+02DA,
+    U+02DC,
+    U+0304,
+    U+0308,
+    U+0329,
+    U+2000-206F,
+    U+20AC,
+    U+2122,
+    U+2191,
+    U+2193,
+    U+2212,
+    U+2215,
+    U+FEFF,
+    U+FFFD;
+}
+
+@font-face {
+  font-family: 'WorldTube Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA,
+    U+02BD-02C5,
+    U+02C7-02CC,
+    U+02CE-02D7,
+    U+02DD-02FF,
+    U+0304,
+    U+0308,
+    U+0329,
+    U+1D00-1DBF,
+    U+1E00-1E9F,
+    U+1EF2-1EFF,
+    U+2020,
+    U+20A0-20AB,
+    U+20AD-20C0,
+    U+2113,
+    U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'WorldTube Inter Tight';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/InterTight-VariableFont_wght.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'WorldTube Inter Tight';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/InterTight-Italic-VariableFont_wght.ttf') format('truetype');
+}
+
+:root {
+  --wt-radius: 3px;
+  --wt-font-inter: 'WorldTube Inter', 'Inter', 'Noto Sans', 'Liberation Sans', 'Segoe UI', system-ui, sans-serif;
+  --wt-font-inter-tight: 'WorldTube Inter Tight', 'Inter Tight', 'WorldTube Inter', 'Inter', system-ui, sans-serif;
+  --wt-font-sf: 'SF Pro Text', 'SF Pro Display', 'SF UI Text', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'WorldTube Inter', system-ui, sans-serif;
+  --wt-font-family: var(--wt-font-inter);
+  --shaka-font-family: var(--wt-font-family) !important;
+}
+
+:root[data-font-preset='sf'] {
+  --wt-font-family: var(--wt-font-sf);
+}
+
+:root[data-font-preset='inter'] {
+  --wt-font-family: var(--wt-font-inter);
+}
+
+:root[data-font-preset='inter-tight'] {
+  --wt-font-family: var(--wt-font-inter-tight);
+}
+
 html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  font-family: var(--wt-font-family);
+}
+
+.shaka-video-container {
+  font-family: var(--wt-font-family) !important;
+}
+
+button,
+input,
+select,
+textarea,
+img,
+video,
+[class*="rounded"],
+.watch-info-card,
+.watch-sidebar-card,
+.shaka-video-container,
+.shaka-video-container * {
+  border-radius: var(--wt-radius) !important;
 }
 
 .watch-layout {
@@ -29,6 +142,9 @@ body,
 
 .watch-info-area {
   grid-area: info;
+  inline-size: 100%;
+  margin-inline: auto;
+  max-inline-size: calc(80vh * 1.78);
   min-inline-size: 0;
   position: relative;
   z-index: 2;
@@ -39,11 +155,26 @@ body,
   min-inline-size: 0;
 }
 
+/*
+ * shaka-player's stock seek-bar thumbnail preview crops one tile out of
+ * YouTube's storyboard sprite sheet by rendering the <img> at its natural
+ * (full sprite) size and CSS-transform-scaling + clipping it inside
+ * .shaka-player-ui-thumbnail-image-container's overflow:hidden. Tailwind's
+ * preflight `img { max-width: 100%; height: auto }` fights that — it shrinks
+ * the sprite to fit the small preview box *before* the crop transform runs,
+ * so the whole grid of thumbnails shows squeezed into the box instead of one
+ * cropped tile. Undo it for this element only.
+ */
+.shaka-player-ui-thumbnail-image {
+  max-inline-size: none;
+  block-size: auto;
+}
+
 .watch-info-card,
 .watch-sidebar-card {
   background: rgb(23 23 23);
   border: 1px solid rgb(38 38 38);
-  border-radius: 8px;
+  border-radius: var(--wt-radius);
 }
 
 .watch-info-card {
@@ -61,12 +192,18 @@ body,
 @media (min-width: 1051px) {
   .watch-layout {
     grid-template:
-      'video video sidebar' auto
-      'info info sidebar' auto / minmax(0, 1fr) minmax(0, 1fr) minmax(380px, 1fr);
+      'video video sidebar' 0fr
+      'info info sidebar' auto
+      'info info sidebar' 1fr / minmax(0, 1fr) minmax(0, 1fr) minmax(380px, 1fr);
   }
 
   .watch-sidebar-area {
     min-inline-size: 380px;
+  }
+
+  .watch-info-area {
+    max-inline-size: none;
+    scroll-margin-block-start: 76px;
   }
 
   .watch-sidebar-card {
@@ -78,6 +215,7 @@ body,
   .watch-layout {
     grid-template:
       'video video video' auto
+      'info info sidebar' auto
       'info info sidebar' auto / minmax(0, 1fr) minmax(0, 1fr) minmax(380px, 1fr);
   }
 }

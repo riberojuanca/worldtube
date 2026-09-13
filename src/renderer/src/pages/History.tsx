@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { VideoCard } from '../components/VideoCard'
+import { useProfiles } from '../profiles/ProfileContext'
 import type { HistoryEntry } from '../../../shared/ipc'
 
 function formatWatchedAt(timestampMs: number): string {
@@ -16,10 +17,18 @@ function formatWatchedAt(timestampMs: number): string {
 
 export function History() {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null)
+  const { activeProfileId } = useProfiles()
 
   useEffect(() => {
-    window.api.getHistory().then(setEntries)
-  }, [])
+    let cancelled = false
+    setEntries(null)
+    window.api.getHistory().then((items) => {
+      if (!cancelled) setEntries(items)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [activeProfileId])
 
   async function handleClear() {
     await window.api.clearHistory()

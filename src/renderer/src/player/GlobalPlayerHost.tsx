@@ -9,8 +9,10 @@ import { useLocation } from 'react-router-dom'
 // from this same path too (see sabr/*.ts) — two separately bundled copies of
 // the shaka namespace in one page don't recognize each other's classes.
 import shaka from 'shaka-player/dist/shaka-player.ui.js'
-import 'shaka-player/dist/controls.css'
+import './styles/shaka-controls.css'
+import './styles/shaka-overrides.css'
 import { useGlobalPlayer } from './GlobalPlayerContext'
+import { PLAYER_COMMAND_EVENT, PLAYER_SEEK_EVENT, PLAYER_STATE_EVENT, type PlayerCommandDetail, type PlayerStateDetail } from './events'
 import { startSabrSession, type SabrSession } from './sabr'
 
 function describeError(error: unknown): unknown {
@@ -39,9 +41,9 @@ function isLoadInterrupted(error: unknown): boolean {
  */
 async function loadThumbnailsTrack(player: shaka.Player, vtt: string | null): Promise<void> {
   if (!vtt) return
-  const uri = `data:text/vtt,${encodeURIComponent(vtt)}`
+  const uri = `data:text/vtt;charset=utf-8,${encodeURIComponent(vtt)}`
   try {
-    await player.addThumbnailsTrack(uri)
+    await player.addThumbnailsTrack(uri, 'text/vtt')
   } catch (error) {
     console.error(`addThumbnailsTrack failed: ${JSON.stringify(describeError(error))}`)
   }
@@ -281,6 +283,73 @@ export function GlobalPlayerHost() {
     return () => sabrSessionRef.current?.dispose()
   }, [])
 
+  useEffect(() => {
+    if (!videoEl) return
+
+    const emitState = () => {
+      const detail: PlayerStateDetail = {
+        paused: videoEl.paused,
+        currentTime: videoEl.currentTime || 0,
+        duration: Number.isFinite(videoEl.duration) ? videoEl.duration : 0
+      }
+      window.dispatchEvent(new CustomEvent<PlayerStateDetail>(PLAYER_STATE_EVENT, { detail }))
+    }
+
+    const handleSeek = (event: Event) => {
+      const seconds = (event as CustomEvent<{ seconds?: number }>).detail?.seconds
+      if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return
+
+      videoEl.currentTime = Math.max(0, seconds)
+      void videoEl.play().catch((error: unknown) => console.error(`video play after seek failed: ${JSON.stringify(describeError(error))}`))
+    }
+
+    const handleCommand = (event: Event) => {
+      const detail = (event as CustomEvent<PlayerCommandDetail>).detail
+      if (!detail) return
+
+      if (detail.action === 'sync') {
+        emitState()
+        return
+      }
+
+      if (detail.action === 'toggle-play') {
+        if (videoEl.paused) {
+          void videoEl.play().catch((error: unknown) => console.error(`video play command failed: ${JSON.stringify(describeError(error))}`))
+        } else {
+          videoEl.pause()
+        }
+        emitState()
+        return
+      }
+
+      if (detail.action === 'seek-relative') {
+        const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : Number.POSITIVE_INFINITY
+        videoEl.currentTime = Math.min(Math.max(videoEl.currentTime + detail.seconds, 0), duration)
+        emitState()
+      }
+    }
+
+    window.addEventListener(PLAYER_SEEK_EVENT, handleSeek)
+    window.addEventListener(PLAYER_COMMAND_EVENT, handleCommand)
+    videoEl.addEventListener('durationchange', emitState)
+    videoEl.addEventListener('ended', emitState)
+    videoEl.addEventListener('loadedmetadata', emitState)
+    videoEl.addEventListener('pause', emitState)
+    videoEl.addEventListener('play', emitState)
+    videoEl.addEventListener('timeupdate', emitState)
+    emitState()
+    return () => {
+      window.removeEventListener(PLAYER_SEEK_EVENT, handleSeek)
+      window.removeEventListener(PLAYER_COMMAND_EVENT, handleCommand)
+      videoEl.removeEventListener('durationchange', emitState)
+      videoEl.removeEventListener('ended', emitState)
+      videoEl.removeEventListener('loadedmetadata', emitState)
+      videoEl.removeEventListener('pause', emitState)
+      videoEl.removeEventListener('play', emitState)
+      videoEl.removeEventListener('timeupdate', emitState)
+    }
+  }, [videoEl])
+
   return (
     <>
       <div ref={hiddenHomeRef} hidden />
@@ -289,7 +358,7 @@ export function GlobalPlayerHost() {
         // (it only sets a data-attribute marker on this element) — controls.css scopes
         // every layout/positioning rule for the control bar under this class, so without
         // it shaka's injected buttons/seek bar render completely unstyled.
-        <div ref={setContainerEl} className="shaka-video-container relative h-full w-full bg-black">
+        <div ref={setContainerEl} className="shaka-video-container relative h-full w-full overflow-hidden bg-black">
           <video ref={setVideoRef} className="h-full w-full" title={title} autoPlay crossOrigin="anonymous" playsInline preload="auto">
             {captions.map((track) => (
               <track

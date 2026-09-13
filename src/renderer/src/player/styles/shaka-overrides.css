@@ -1,0 +1,14 @@
+.shaka-video-container,
+.shaka-video-container button,
+.shaka-video-container input,
+.shaka-video-container select,
+.shaka-video-container textarea {
+  font-family: var(--wt-font-family) !important;
+}
+
+.shaka-video-container,
+.shaka-video-container *,
+.shaka-video-container *::before,
+.shaka-video-container *::after {
+  border-radius: var(--wt-radius) !important;
+}

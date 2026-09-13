@@ -1,16 +1,39 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { IPC_CHANNELS } from '../shared/ipc'
 import type {
   ChannelResponse,
+  CreateLocalUserRequest,
+  DeleteLocalUserRequest,
+  CreateProfileRequest,
+  LocalSessionState,
+  LoginLocalUserRequest,
+  ProfilesState,
   SearchRequest,
   SearchResponse,
   Subscription,
+  UpdateProfileRequest,
   VideoInfoRequest,
   VideoInfoResponse
 } from '../shared/ipc'
 import { fetchVideoInfo, getChannelInfo, getHomeFeed, getSubscriptionsFeed, searchVideos } from './youtube'
 import { clearHistory, getHistory } from './historyStore'
+import {
+  createLocalUser,
+  deleteLocalUser,
+  createUserProfile,
+  exportLocalData,
+  getProfilesState,
+  getSessionState,
+  importLocalData,
+  listActiveSavedPlaylists,
+  listActiveSavedVideos,
+  loginLocalUser,
+  logoutLocalUser,
+  removeUserProfile,
+  setActiveUserProfile,
+  updateUserProfile
+} from './localDb'
 import { addSubscription, listSubscriptions, removeSubscription } from './subscriptionsStore'
 
 // This dev machine doesn't have the setuid chrome-sandbox helper configured
@@ -122,8 +145,47 @@ ipcMain.handle(IPC_CHANNELS.GET_CHANNEL, async (_event, { channelId }: { channel
   }
 })
 
+ipcMain.handle(IPC_CHANNELS.SESSION_GET_STATE, (): Promise<LocalSessionState> => getSessionState())
+ipcMain.handle(IPC_CHANNELS.SESSION_CREATE_USER, (_event, request: CreateLocalUserRequest): Promise<LocalSessionState> => createLocalUser(request))
+ipcMain.handle(IPC_CHANNELS.SESSION_LOGIN, (_event, request: LoginLocalUserRequest): Promise<LocalSessionState> => loginLocalUser(request))
+ipcMain.handle(IPC_CHANNELS.SESSION_LOGOUT, (): Promise<LocalSessionState> => logoutLocalUser())
+ipcMain.handle(IPC_CHANNELS.SESSION_DELETE_USER, (_event, request: DeleteLocalUserRequest): Promise<LocalSessionState> => deleteLocalUser(request))
+
+ipcMain.handle(IPC_CHANNELS.DATA_EXPORT, async (event): Promise<string | null> => {
+  const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+  const result = await dialog.showSaveDialog(ownerWindow, {
+    title: 'Exportar datos de WorldTube',
+    defaultPath: 'worldtube-data.json',
+    filters: [{ name: 'WorldTube data', extensions: ['json'] }]
+  })
+  if (result.canceled || !result.filePath) return null
+  await exportLocalData(result.filePath)
+  return result.filePath
+})
+
+ipcMain.handle(IPC_CHANNELS.DATA_IMPORT, async (event): Promise<LocalSessionState | null> => {
+  const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+  const result = await dialog.showOpenDialog(ownerWindow, {
+    title: 'Importar datos de WorldTube',
+    properties: ['openFile'],
+    filters: [{ name: 'WorldTube data', extensions: ['json'] }]
+  })
+  const [filePath] = result.filePaths
+  if (result.canceled || !filePath) return null
+  return importLocalData(filePath)
+})
+
+ipcMain.handle(IPC_CHANNELS.PROFILES_GET_STATE, (): Promise<ProfilesState> => getProfilesState())
+ipcMain.handle(IPC_CHANNELS.PROFILES_CREATE, (_event, request: CreateProfileRequest): Promise<ProfilesState> => createUserProfile(request))
+ipcMain.handle(IPC_CHANNELS.PROFILES_UPDATE, (_event, request: UpdateProfileRequest): Promise<ProfilesState> => updateUserProfile(request))
+ipcMain.handle(IPC_CHANNELS.PROFILES_SET_ACTIVE, (_event, profileId: string): Promise<ProfilesState> => setActiveUserProfile(profileId))
+ipcMain.handle(IPC_CHANNELS.PROFILES_REMOVE, (_event, profileId: string): Promise<ProfilesState> => removeUserProfile(profileId))
+
 ipcMain.handle(IPC_CHANNELS.HISTORY_LIST, () => getHistory())
 ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, () => clearHistory())
+
+ipcMain.handle(IPC_CHANNELS.SAVED_PLAYLISTS_LIST, () => listActiveSavedPlaylists())
+ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_LIST, () => listActiveSavedVideos())
 
 ipcMain.handle(IPC_CHANNELS.SUBSCRIPTIONS_LIST, () => listSubscriptions())
 ipcMain.handle(IPC_CHANNELS.SUBSCRIPTIONS_FEED, async (): Promise<SearchResponse> => {

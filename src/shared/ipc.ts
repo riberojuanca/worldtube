@@ -5,13 +5,125 @@ export const IPC_CHANNELS = {
   SEARCH: 'youtube:search',
   GET_CHANNEL: 'youtube:get-channel',
   GET_HOME_FEED: 'youtube:get-home-feed',
+  SESSION_GET_STATE: 'session:get-state',
+  SESSION_CREATE_USER: 'session:create-user',
+  SESSION_LOGIN: 'session:login',
+  SESSION_LOGOUT: 'session:logout',
+  SESSION_DELETE_USER: 'session:delete-user',
+  DATA_EXPORT: 'data:export',
+  DATA_IMPORT: 'data:import',
+  PROFILES_GET_STATE: 'profiles:get-state',
+  PROFILES_CREATE: 'profiles:create',
+  PROFILES_UPDATE: 'profiles:update',
+  PROFILES_SET_ACTIVE: 'profiles:set-active',
+  PROFILES_REMOVE: 'profiles:remove',
   HISTORY_LIST: 'history:list',
   HISTORY_CLEAR: 'history:clear',
+  SAVED_PLAYLISTS_LIST: 'saved:playlists:list',
+  SAVED_VIDEOS_LIST: 'saved:videos:list',
   SUBSCRIPTIONS_LIST: 'subscriptions:list',
   SUBSCRIPTIONS_FEED: 'subscriptions:feed',
   SUBSCRIPTIONS_ADD: 'subscriptions:add',
   SUBSCRIPTIONS_REMOVE: 'subscriptions:remove'
 } as const
+
+export interface LocalUser {
+  id: string
+  name: string
+  hasPassword: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface UserProfile {
+  id: string
+  userId: string
+  name: string
+  color: string
+  textColor: string
+  avatarDataUrl: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SavedPlaylist {
+  id: string
+  profileId: string
+  name: string
+  description: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SavedVideo {
+  id: string
+  profileId: string
+  videoId: string
+  title: string
+  channelId: string | null
+  channelName: string
+  thumbnailUrl: string | null
+  playlistId: string | null
+  savedAt: number
+}
+
+export interface LocalSessionState {
+  users: LocalUser[]
+  activeUserId: string | null
+  activeUser: LocalUser | null
+  profiles: UserProfile[]
+  activeProfileId: string | null
+  activeProfile: UserProfile | null
+  setupRequired: boolean
+  dataPath: string
+  storageVersion: number
+  stats: {
+    users: number
+    profiles: number
+    activeHistoryEntries: number
+    activeSubscriptions: number
+    activeSavedPlaylists: number
+    activeSavedVideos: number
+    historyEntries: number
+    subscriptions: number
+    savedPlaylists: number
+    savedVideos: number
+    settingsKeys: number
+  }
+}
+
+export interface ProfilesState {
+  profiles: UserProfile[]
+  activeProfileId: string
+  activeProfile: UserProfile
+}
+
+export interface CreateLocalUserRequest {
+  name: string
+  password?: string
+}
+
+export interface LoginLocalUserRequest {
+  userId: string
+  password?: string
+}
+
+export interface DeleteLocalUserRequest {
+  userId: string
+}
+
+export interface CreateProfileRequest {
+  name: string
+  color?: string
+}
+
+export interface UpdateProfileRequest {
+  id: string
+  name?: string
+  color?: string
+  textColor?: string
+  avatarDataUrl?: string | null
+}
 
 export interface HistoryEntry {
   videoId: string
@@ -120,8 +232,16 @@ export interface VideoInfoResult {
   title: string
   channelId: string | null
   channelName: string
+  channelThumbnailUrl: string | null
+  subscriberCountText: string | null
   thumbnailUrl: string | null
   lengthSeconds: number | null
+  durationText: string | null
+  viewCountText: string | null
+  likeCountText: string | null
+  publishedText: string | null
+  category: string | null
+  description: string | null
   captions: CaptionTrack[]
   /** WebVTT thumbnails track (built from YouTube's storyboard spec) for the seek-bar hover preview, or null when the video has no storyboard. */
   storyboardVtt: string | null

@@ -356,7 +356,7 @@ function formatVttTimestamp(ms: number): string {
  * board level YouTube offers; earlier levels are coarser previews meant for
  * the tiny scrubber YouTube's own web player shows before you start hovering.
  */
-function buildStoryboardVtt(storyboards: unknown): string | null {
+function buildStoryboardVtt(storyboards: unknown, videoLengthSeconds: number | null): string | null {
   if (!storyboards || typeof storyboards !== 'object' || !('boards' in storyboards) || !Array.isArray(storyboards.boards)) {
     return null
   }
@@ -375,19 +375,98 @@ function buildStoryboardVtt(storyboards: unknown): string | null {
   if (!board || board.thumbnail_count <= 0) return null
 
   const tilesPerPage = board.columns * board.rows
+  const numberOfImages = Math.ceil(board.thumbnail_count / tilesPerPage)
+  const intervalInSeconds = board.interval > 0
+    ? board.interval / 1000
+    : (videoLengthSeconds ?? 0) / (numberOfImages * tilesPerPage)
   const lines = ['WEBVTT', '']
-  for (let i = 0; i < board.thumbnail_count; i++) {
-    const page = Math.floor(i / tilesPerPage)
-    const indexInPage = i % tilesPerPage
-    const x = (indexInPage % board.columns) * board.thumbnail_width
-    const y = Math.floor(indexInPage / board.columns) * board.thumbnail_height
-    const spriteUrl = board.template_url.replace('$M', String(page))
+  let startSeconds = 0
 
-    lines.push(`${formatVttTimestamp(i * board.interval)} --> ${formatVttTimestamp((i + 1) * board.interval)}`)
-    lines.push(`${spriteUrl}#xywh=${x},${y},${board.thumbnail_width},${board.thumbnail_height}`)
-    lines.push('')
+  for (let i = 0; i < numberOfImages; i++) {
+    const spriteUrl = board.template_url.replace('$M.jpg', `${i}.jpg`)
+    let x = 0
+    let y = 0
+
+    for (let j = 0; j < tilesPerPage; j++) {
+      const endSeconds = startSeconds + intervalInSeconds
+      lines.push(`${formatVttTimestamp(startSeconds * 1000)} --> ${formatVttTimestamp(endSeconds * 1000)}`)
+      lines.push(`${spriteUrl}#xywh=${x},${y},${board.thumbnail_width},${board.thumbnail_height}`)
+      lines.push('')
+
+      startSeconds = endSeconds
+      x = (x + board.thumbnail_width) % (board.thumbnail_width * board.columns)
+      if (x === 0) y += board.thumbnail_height
+    }
   }
   return lines.join('\n')
+}
+
+function getChannelThumbnailUrl(info: { secondary_info?: { owner?: { author?: { best_thumbnail?: { url: string }; avatar_thumbnail_url?: string } } | null } | null }): string | null {
+  return info.secondary_info?.owner?.author?.best_thumbnail?.url ?? info.secondary_info?.owner?.author?.avatar_thumbnail_url ?? null
+}
+
+function formatInteger(value: number): string {
+  return new Intl.NumberFormat('es-UY').format(value)
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat('es-UY', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }).format(value)
+}
+
+function formatDurationText(seconds: number | null | undefined): string | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null
+  const totalSeconds = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const remainingSeconds = totalSeconds % 60
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
+  }
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`
+}
+
+function formatDateText(value: string | undefined): string | null {
+  if (!value) return null
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('es-UY', { dateStyle: 'medium', timeZone: 'UTC' }).format(date)
+}
+
+function getViewCountText(info: {
+  basic_info: { view_count?: number }
+  primary_info?: { view_count?: { view_count?: { toString(): string }; short_view_count?: { toString(): string } } | null } | null
+}): string | null {
+  const viewCount = info.basic_info.view_count
+  if (typeof viewCount === 'number' && Number.isFinite(viewCount)) {
+    return `${formatInteger(viewCount)} visualizaciones`
+  }
+
+  return info.primary_info?.view_count?.view_count?.toString() ?? info.primary_info?.view_count?.short_view_count?.toString() ?? null
+}
+
+function getLikeCountText(likeCount: number | undefined): string | null {
+  if (typeof likeCount !== 'number' || !Number.isFinite(likeCount)) return null
+  return formatCompactNumber(likeCount)
+}
+
+function getPublishedText(info: {
+  primary_info?: { published?: { toString(): string } } | null
+  page?: [unknown, unknown?]
+}): string | null {
+  const microformat = (info.page?.[0] as { microformat?: unknown } | undefined)?.microformat as
+    | { publish_date?: string; upload_date?: string }
+    | undefined
+  return info.primary_info?.published?.toString() ?? formatDateText(microformat?.publish_date ?? microformat?.upload_date)
+}
+
+function getDescriptionText(info: { secondary_info?: { description?: { toString(): string } } | null; basic_info: { short_description?: string } }): string | null {
+  const description = info.secondary_info?.description?.toString() ?? info.basic_info.short_description ?? null
+  const trimmed = description?.trim()
+  return trimmed ? trimmed : null
+}
+
+function getSubscriberCountText(info: { secondary_info?: { owner?: { subscriber_count?: { toString(): string } } | null } | null }): string | null {
+  return info.secondary_info?.owner?.subscriber_count?.toString() ?? null
 }
 
 async function fetchVideoInfoUncached(videoId: string): Promise<VideoInfoResult> {
@@ -474,11 +553,19 @@ async function fetchVideoInfoUncached(videoId: string): Promise<VideoInfoResult>
     title: info.basic_info.title ?? '(sin título)',
     channelId: info.basic_info.channel?.id ?? null,
     channelName: info.basic_info.channel?.name ?? '(desconocido)',
+    channelThumbnailUrl: getChannelThumbnailUrl(info),
+    subscriberCountText: getSubscriberCountText(info),
     captions: info.captions ? extractCaptionTracks(info.captions) : [],
-    storyboardVtt: buildStoryboardVtt(info.storyboards),
+    storyboardVtt: buildStoryboardVtt(info.storyboards, info.basic_info.duration ?? null),
     relatedVideos: info.watch_next_feed ? mapWatchNextFeed(info.watch_next_feed) : [],
     thumbnailUrl: info.basic_info.thumbnail?.at(-1)?.url ?? null,
     lengthSeconds: info.basic_info.duration ?? null,
+    durationText: formatDurationText(info.basic_info.duration ?? null),
+    viewCountText: getViewCountText(info),
+    likeCountText: getLikeCountText(info.basic_info.like_count),
+    publishedText: getPublishedText(info),
+    category: info.basic_info.category,
+    description: getDescriptionText(info),
     dashManifest: manifest,
     sabr
   }

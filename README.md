@@ -29,23 +29,30 @@ para el puente SABR/UMP.
 
 Funciona:
 
-- Shell Electron con navegación, header, sidebar y mini reproductor flotante.
+- Base visual: todos los redondeos van a 3px. La fuente base usa Inter local por defecto, con Inter Tight local disponible para comparar; Roboto no se carga desde la nube.
+- Usuarios/sesión local: usuario local con contraseña opcional, login/logout, perfil activo arriba a la derecha, edición de nombre/foto/color desde ese menú, panel Cuenta para datos locales y export/import completo.
+- Shell Electron con navegación, header, sidebar y mini reproductor flotante arrastrable.
 - Un único player global persistente en `GlobalPlayerHost.tsx`, movido por portal entre
   `#global-player-watch-slot` y `#global-player-mini-slot`.
+- Mini reproductor: se puede mover, arrastrar hacia abajo para minimizar a barra inferior con
+  controles, restaurar con flecha diagonal o arrastrar la barra hacia arriba sin desmontar el
+  `<video>`.
 - Reproducción SABR/DASH con Shaka, poToken real, CORS ajustado para `googlevideo.com` y timedtext.
 - UI oficial de Shaka (`shaka.ui.Overlay`) creada con el mismo orden que FreeTube Lab: Overlay,
   controls/player, attach del `<video>`.
 - Página `/watch/:videoId` con layout tipo FreeTube: video, tarjeta de info básica y sidebar
   compacta "A continuación".
+- Watch fase 2: vistas/fecha/duración/categoría/likes, canal con avatar y suscriptores,
+  suscripción local, copiar enlace y descripción expandible con timestamps clickeables.
 - Recomendados de Watch desde `watch_next_feed`, incluyendo `CompactVideo`, `CompactMovie` y
   `LockupView` (`VIDEO`/`STATION`), igual que FreeTube Lab.
 - Búsqueda, home feed, historial local, páginas de canal y suscripciones locales.
+- Secciones de biblioteca en la barra izquierda: Guardados y Playlists leen la DB del perfil activo.
+- Los datos viven en una DB local versionada (`worldtube-data.json`): usuarios, sesión, perfiles, historial, suscripciones, playlists guardadas, videos guardados y settings futuras. Los archivos globales viejos se migran a esa DB al primer arranque.
 - Captions como `<track>` WebVTT y storyboards como thumbnails de Shaka.
 
 Pendiente para acercar más la página Watch a FreeTube:
 
-- Detalles completos del video: vistas, fecha, likes, subscribe, compartir, playlists.
-- Descripción expandible con timestamps clickeables.
 - Capítulos.
 - Comentarios.
 - Playlist en sidebar.

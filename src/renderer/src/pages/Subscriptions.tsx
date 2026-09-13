@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { VideoCard } from '../components/VideoCard'
+import { useProfiles } from '../profiles/ProfileContext'
 import type { SearchResultItem, Subscription } from '../../../shared/ipc'
 
 type FeedStatus = 'loading' | 'ready' | 'error'
@@ -10,10 +11,20 @@ export function Subscriptions() {
   const [feedStatus, setFeedStatus] = useState<FeedStatus>('loading')
   const [feed, setFeed] = useState<SearchResultItem[]>([])
   const [feedError, setFeedError] = useState<string | null>(null)
+  const { activeProfileId } = useProfiles()
 
   useEffect(() => {
-    window.api.listSubscriptions().then(setSubs)
+    let cancelled = false
+    setSubs(null)
+    setFeed([])
+    setFeedStatus('loading')
+    setFeedError(null)
+
+    window.api.listSubscriptions().then((items) => {
+      if (!cancelled) setSubs(items)
+    })
     window.api.getSubscriptionsFeed().then((response) => {
+      if (cancelled) return
       if (response.ok) {
         setFeed(response.data)
         setFeedStatus('ready')
@@ -22,7 +33,10 @@ export function Subscriptions() {
         setFeedStatus('error')
       }
     })
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [activeProfileId])
 
   if (subs === null) return <p className="text-sm text-neutral-400">Cargando…</p>
 

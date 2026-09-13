@@ -1,8 +1,100 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { WATCH_SLOT_ID } from '../player/GlobalPlayerHost'
 import { useGlobalPlayer } from '../player/GlobalPlayerContext'
+import { PLAYER_SEEK_EVENT } from '../player/events'
+import { useProfiles } from '../profiles/ProfileContext'
+import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { SearchResultItem } from '../../../shared/ipc'
+
+type IconName = 'check' | 'clock' | 'copy' | 'eye' | 'tag' | 'thumb'
+
+function Icon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
+  const paths: Record<IconName, JSX.Element> = {
+    check: <path d="m5 12 4 4L19 6" />,
+    clock: <path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
+    copy: <path d="M8 8h10v10H8zM6 16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />,
+    eye: <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />,
+    tag: <path d="M20 10v8a2 2 0 0 1-2 2h-8L4 14V6a2 2 0 0 1 2-2h8l6 6Z M8 8h.01" />,
+    thumb: <path d="M7 11v9M7 11H4v9h3M7 11l4-8h1.5a2 2 0 0 1 2 2.3L14 8h4a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 16.8 19H7" />
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      {paths[name]}
+    </svg>
+  )
+}
+
+function parseTimestamp(value: string): number | null {
+  const parts = value.split(':').map(Number)
+  if (parts.some((part) => !Number.isInteger(part) || part < 0)) return null
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts
+    if (seconds >= 60) return null
+    return minutes * 60 + seconds
+  }
+
+  if (parts.length === 3) {
+    const [hours, minutes, seconds] = parts
+    if (minutes >= 60 || seconds >= 60) return null
+    return hours * 3600 + minutes * 60 + seconds
+  }
+
+  return null
+}
+
+function DescriptionWithTimestamps({ text, onSeek }: { text: string; onSeek: (seconds: number) => void }) {
+  const nodes = useMemo<ReactNode[]>(() => {
+    const parts: ReactNode[] = []
+    const timestampRegex = /\b(?:(\d{1,2}):)?\d{1,3}:\d{2}\b/g
+    let lastIndex = 0
+
+    for (const match of text.matchAll(timestampRegex)) {
+      const value = match[0]
+      const index = match.index ?? 0
+      const seconds = parseTimestamp(value)
+      if (seconds === null) continue
+
+      if (index > lastIndex) parts.push(text.slice(lastIndex, index))
+      parts.push(
+        <button
+          key={`${index}:${value}`}
+          type="button"
+          onClick={() => onSeek(seconds)}
+          className="rounded px-1 font-medium text-sky-300 hover:bg-sky-400/10 hover:text-sky-200"
+        >
+          {value}
+        </button>
+      )
+      lastIndex = index + value.length
+    }
+
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+    return parts
+  }, [onSeek, text])
+
+  return <>{nodes}</>
+}
+
+function DetailPill({ icon, text }: { icon: IconName; text: string }) {
+  return (
+    <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-neutral-900 px-3 text-sm text-neutral-300">
+      <Icon name={icon} className="h-3.5 w-3.5 text-neutral-500" />
+      <span className="truncate">{text}</span>
+    </span>
+  )
+}
 
 function RelatedVideoRow({ video }: { video: SearchResultItem }) {
   const meta = [video.viewCountText, video.publishedText].filter(Boolean).join(' · ')
@@ -48,18 +140,85 @@ export function Watch() {
     title,
     channelId,
     channelName,
+    channelThumbnailUrl,
+    subscriberCountText,
+    durationText,
+    viewCountText,
+    likeCountText,
+    publishedText,
+    category,
+    description,
     relatedVideos,
     status,
     error
   } = useGlobalPlayer()
+  const { activeProfileId } = useProfiles()
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    setIsDescriptionExpanded(false)
+    setCopyState('idle')
     if (videoId && videoId !== activeVideoId) {
       playVideo(videoId)
     }
     // Only re-run when the route param itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId])
+
+  useEffect(() => {
+    if (!channelId) {
+      setIsSubscribed(false)
+      return
+    }
+
+    let cancelled = false
+    window.api.listSubscriptions().then((subs) => {
+      if (!cancelled) setIsSubscribed(subs.some((sub) => sub.channelId === channelId))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeProfileId, channelId])
+
+  async function toggleSubscription() {
+    if (!channelId) return
+    if (isSubscribed) {
+      await window.api.unsubscribe(channelId)
+    } else {
+      await window.api.subscribe({
+        channelId,
+        channelName,
+        thumbnailUrl: channelThumbnailUrl
+      })
+    }
+    setIsSubscribed((value) => !value)
+    window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
+  }
+
+  async function copyShareLink() {
+    if (!videoId) return
+    try {
+      await navigator.clipboard.writeText(`https://youtu.be/${videoId}`)
+      setCopyState('copied')
+      window.setTimeout(() => setCopyState('idle'), 1600)
+    } catch {
+      setCopyState('error')
+    }
+  }
+
+  function seekTo(seconds: number) {
+    window.dispatchEvent(new CustomEvent(PLAYER_SEEK_EVENT, { detail: { seconds } }))
+  }
+
+  const detailPills: { icon: IconName; text: string }[] = []
+  if (viewCountText) detailPills.push({ icon: 'eye', text: viewCountText })
+  if (publishedText) detailPills.push({ icon: 'clock', text: publishedText })
+  if (durationText) detailPills.push({ icon: 'clock', text: durationText })
+  if (category) detailPills.push({ icon: 'tag', text: category })
 
   return (
     <div className="watch-layout">
@@ -75,20 +234,81 @@ export function Watch() {
         {status === 'ready' && (
           <div className="watch-info-card">
             <h1 className="text-xl font-semibold leading-snug text-neutral-50">{title}</h1>
-            <div className="mt-4 flex min-w-0 items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-neutral-800 text-sm font-semibold text-neutral-200">
-                {channelName ? channelName.slice(0, 2).toUpperCase() : 'WT'}
+            {detailPills.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {detailPills.map((pill) => (
+                  <DetailPill key={`${pill.icon}:${pill.text}`} icon={pill.icon} text={pill.text} />
+                ))}
               </div>
-              <div className="min-w-0">
-                {channelId ? (
-                  <Link to={`/channel/${channelId}`} className="block truncate font-medium text-neutral-200 hover:text-white">
-                    {channelName}
-                  </Link>
+            )}
+
+            <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                {channelThumbnailUrl ? (
+                  <img src={channelThumbnailUrl} alt="" className="h-11 w-11 shrink-0 rounded-full bg-neutral-800 object-cover" />
                 ) : (
-                  <p className="truncate font-medium text-neutral-200">{channelName}</p>
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-neutral-800 text-sm font-semibold text-neutral-200">
+                    {channelName ? channelName.slice(0, 2).toUpperCase() : 'WT'}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  {channelId ? (
+                    <Link to={`/channel/${channelId}`} className="block truncate font-medium text-neutral-200 hover:text-white">
+                      {channelName}
+                    </Link>
+                  ) : (
+                    <p className="truncate font-medium text-neutral-200">{channelName}</p>
+                  )}
+                  {subscriberCountText && <p className="truncate text-sm text-neutral-500">{subscriberCountText}</p>}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {channelId && (
+                  <button
+                    type="button"
+                    onClick={toggleSubscription}
+                    className={
+                      isSubscribed
+                        ? 'inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200 hover:bg-neutral-700'
+                        : 'inline-flex h-9 items-center gap-2 rounded-full bg-neutral-100 px-4 text-sm font-medium text-neutral-950 hover:bg-white'
+                    }
+                  >
+                    {isSubscribed && <Icon name="check" className="h-4 w-4" />}
+                    {isSubscribed ? 'Suscripto' : 'Suscribirse'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={copyShareLink}
+                  className="inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200 hover:bg-neutral-700"
+                >
+                  <Icon name="copy" className="h-4 w-4" />
+                  {copyState === 'copied' ? 'Copiado' : copyState === 'error' ? 'Error' : 'Copiar enlace'}
+                </button>
+                {likeCountText && (
+                  <span className="inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200">
+                    <Icon name="thumb" className="h-4 w-4" />
+                    {likeCountText}
+                  </span>
                 )}
               </div>
             </div>
+
+            {description && (
+              <div className="mt-4 rounded-lg bg-neutral-900 p-3">
+                <p className={isDescriptionExpanded ? 'whitespace-pre-wrap text-sm leading-6 text-neutral-200' : 'line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-neutral-200'}>
+                  <DescriptionWithTimestamps text={description} onSeek={seekTo} />
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsDescriptionExpanded((value) => !value)}
+                  className="mt-2 text-sm font-medium text-neutral-100 hover:text-white"
+                >
+                  {isDescriptionExpanded ? 'Mostrar menos' : 'Mostrar más'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>
