@@ -1,0 +1,5 @@
+# Preserve upstream receipts byte-for-byte on Windows checkouts.
+third-party/** -text
+src/renderer/src/assets/fonts/** -text
+src/renderer/src/assets/icons/*.svg -text
+src/renderer/src/assets/icons/LICENSE-* -text

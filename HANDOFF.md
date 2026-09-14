@@ -2,6 +2,12 @@
 
 ## Delivery Closure: 2026-09-14
 
+- v0.0.2 Linux release packaging/upload succeeded. Windows stopped because
+  checkout converted reviewed upstream notice files to CRLF, breaking their
+  exact-byte receipts. .gitattributes now preserves notices/fonts/icon assets
+  verbatim; hash verification is unchanged. Release 0.0.3 uses a fresh tag.
+  CI artifacts exclude unpacked app trees to avoid duplicate large uploads.
+
 - Authorized GitHub CLI session exposed the two exact release failures:
   Electron's dist/LICENSE was absent in Linux CI, and Windows Corepack setup
   collided with the preinstalled yarn.cmd shim. CI now explicitly invokes

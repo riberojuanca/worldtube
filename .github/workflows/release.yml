@@ -82,7 +82,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: worldtube-${{ matrix.os }}
-          path: release/*
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+            release/*.yml
+            release/*.blockmap
           if-no-files-found: error
 
   mac:
