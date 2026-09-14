@@ -136,11 +136,30 @@ function ProfileMenu() {
   useLocale()
   const { profiles, activeUser, activeProfile, activeProfileId, setActiveProfile, updateProfile, logoutLocalUser } = useProfiles()
   const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const [editProfileName, setEditProfileName] = useState(activeProfile.name)
   const [editProfileColor, setEditProfileColor] = useState(activeProfile.color)
   const [editProfileAvatar, setEditProfileAvatar] = useState<string | null>(activeProfile.avatarDataUrl)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setIsOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setIsOpen(false)
+      menuRef.current?.querySelector('button')?.focus()
+    }
+    window.addEventListener('pointerdown', closeOnOutsidePointer)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsidePointer)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     setEditProfileName(activeProfile.name)
@@ -170,6 +189,7 @@ function ProfileMenu() {
       })
       setMessage(t("Perfil guardado"))
       setError(null)
+      setIsOpen(false)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError))
     }
@@ -201,7 +221,7 @@ function ProfileMenu() {
   }
 
   return (
-    <div className="relative">
+    <div ref={menuRef} className="relative">
       <button
         type="button"
         onClick={() => setIsOpen((value) => !value)}
@@ -395,7 +415,7 @@ function SearchBar() {
           }}
           onFocus={() => setIsDropdownOpen(true)}
           placeholder={t("Buscar / Ir a URL")}
-          className="min-w-0 flex-1 bg-transparent outline-none"
+          className="wt-search-input min-w-0 flex-1 bg-transparent outline-none"
         />
       </label>
       {isDropdownOpen && hasDropdownItems && (

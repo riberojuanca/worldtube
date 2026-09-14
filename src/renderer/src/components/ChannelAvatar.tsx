@@ -8,11 +8,12 @@ interface ChannelAvatarProps {
 }
 
 function sizedAvatarUrl(source: string | null, size?: number): string | null {
-  if (!source || !size) return source
+  if (!source) return source
   try {
-    const url = new URL(source)
-    if (url.protocol !== 'https:' || !['yt3.ggpht.com', 'yt3.googleusercontent.com'].includes(url.hostname)) return source
-    url.pathname = url.pathname.replace(/=s\d+(?=-|$)/, `=s${size}`)
+    const url = new URL(source.startsWith('//') ? `https:${source}` : source)
+    if (!['http:', 'https:'].includes(url.protocol) || !['yt3.ggpht.com', 'yt3.googleusercontent.com'].includes(url.hostname)) return source
+    url.protocol = 'https:'
+    if (size) url.pathname = url.pathname.replace(/=s\d+(?=-|$)/, `=s${size}`)
     return url.href
   } catch { return source }
 }
@@ -28,13 +29,14 @@ function initials(name: string): string {
 
 export function ChannelAvatar({ name, thumbnailUrl, className = 'h-8 w-8', imageSize }: ChannelAvatarProps) {
   const preferredUrl = sizedAvatarUrl(thumbnailUrl, imageSize)
+  const fallbackUrl = sizedAvatarUrl(thumbnailUrl)
   const [failedUrls, setFailedUrls] = useState<string[]>([])
 
   useEffect(() => {
     setFailedUrls([])
   }, [thumbnailUrl, imageSize])
 
-  const currentUrl = [preferredUrl, thumbnailUrl].find((url) => url && !failedUrls.includes(url))
+  const currentUrl = [preferredUrl, fallbackUrl].find((url) => url && !failedUrls.includes(url))
 
   if (currentUrl) {
     return (

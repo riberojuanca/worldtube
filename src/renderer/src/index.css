@@ -291,6 +291,10 @@ button[data-saved='true'] {
   outline-offset: 2px;
 }
 
+.wt-search-input:focus-visible {
+  outline: none;
+}
+
 input[type='checkbox'] {
   accent-color: var(--wt-accent);
 }

@@ -1,5 +1,26 @@
 # WorldTube: Current Implementation
 
+## Version 0.0.4: First-Use Corrections
+
+- Owner confirmed the published Windows v0.0.3 application works. This does
+  not yet validate the installed updater cycle or all export/import scenarios.
+- Fresh profiles now receive a diverse, deduplicated discovery feed from
+  language-aware video searches when anonymous home, history recommendations
+  and subscriptions provide no videos. No artificial history is recorded.
+- Search channel avatars were blocked by the image CSP because YouTube returned
+  HTTP URLs. ChannelAvatar upgrades known YouTube avatar hosts to HTTPS,
+  including the original-size fallback, without relaxing the CSP.
+- Search focus uses only the existing outer border change, not the global
+  thick inner outline. Other controls retain their keyboard focus outlines.
+- Profile dropdown closes on outside pointer presses, Escape and successful
+  Save. Failed saves remain open to display the error.
+- Version 0.0.4 is prepared for GitHub CI packaging; no local build or automated
+  UI test was run for these corrections. Publication status is recorded below
+  after the release workflow finishes.
+- Installed updates are checked on startup when enabled (default), or manually.
+  There is no periodic poll. Download and restart/install require user action;
+  neither download nor installation-on-quit happens automatically.
+
 ## Delivery Closure: 2026-09-14
 
 - PUBLIC DELIVERY: v0.0.3 published successfully by run 34802506753. Windows

@@ -373,9 +373,12 @@ export async function getSearchSuggestions(query: string): Promise<string[]> {
 export async function getHomeFeed(sections: HomeSection[] = []): Promise<SearchResultItem[]> {
   console.log('[youtube] getHomeFeed()')
   const yt = await getClient()
-  const feed = await yt.getHomeFeed()
-  const videos = mapSearchResultNodes(feed.videos)
-  console.log(`[youtube] home: ${feed.videos.length} video nodes, ${videos.length} mapped videos`)
+  const feed = await yt.getHomeFeed().catch((error) => {
+    console.warn('[youtube] anonymous home failed, using discovery:', error instanceof Error ? error.message : String(error))
+    return null
+  })
+  const videos = feed ? mapSearchResultNodes(feed.videos) : []
+  console.log(`[youtube] home: ${feed?.videos.length ?? 0} video nodes, ${videos.length} mapped videos`)
   if (videos.length) return videos
 
   // Anonymous home responses can have no recommendations. Use this profile's
@@ -411,9 +414,32 @@ export async function getHomeFeed(sections: HomeSection[] = []): Promise<SearchR
   if (subscriptions.length) {
     const subscribedVideos = await getSubscriptionsFeed(subscriptions.slice(0, 6).map((channel) => channel.channelId))
     console.log(`[youtube] home: ${subscribedVideos.length} videos from local subscriptions`)
-    return subscribedVideos
+    if (subscribedVideos.length) return subscribedVideos
   }
-  return []
+
+  // A fresh local profile has no recommendation seeds. Fetch real discovery
+  // results without adding artificial entries to its history or subscriptions.
+  const queries = getAppLanguage() === 'es'
+    ? ['música en vivo', 'ciencia y tecnología', 'naturaleza y viajes']
+    : ['live music', 'science and technology', 'nature and travel']
+  const batches = await Promise.all(queries.map(async (query) => {
+    try {
+      const results = await yt.search(query, { type: 'video' })
+      return mapSearchResultNodes(results.videos).slice(0, 8)
+    } catch (error) {
+      console.warn('[youtube] initial discovery failed:', error instanceof Error ? error.message : String(error))
+      return [] as SearchResultItem[]
+    }
+  }))
+  const discovery = new Map<string, SearchResultItem>()
+  for (let index = 0; index < 8; index++) {
+    for (const batch of batches) {
+      const video = batch[index]
+      if (video && !discovery.has(video.videoId)) discovery.set(video.videoId, video)
+    }
+  }
+  console.log(`[youtube] home: ${discovery.size} initial discovery videos`)
+  return [...discovery.values()]
 }
 
 export async function getHomeDiscovery(): Promise<{ videos: SearchResultItem[]; home: HomeDiscovery }> {
