@@ -1,5 +1,64 @@
 # WorldTube: Current Implementation
 
+## Delivery Closure: 2026-09-14
+
+- Owner selected AGPL-3.0-only, requested no further feature work and authorized
+  repository, Pages and installer publication. LICENSE/COPYRIGHT.txt are added
+  to installer resources. Concrete technical review is complete in
+  .github/DISTRIBUTION_REVIEW.md; older generic approval/license blockers below
+  are superseded, with historical findings preserved.
+- Page source: site/; node scripts/prepare-site.mjs prepares build/site without
+  compiling the app. Canonical logo canvas is cropped without redrawing it.
+  Black screen, large logo, three download buttons; nonexistent assets disabled.
+- Pages uses its own workflow. Releases build Windows/Linux on explicit tags
+  and publish only when enabled packaging jobs succeed, with source archive.
+  macOS remains signing-gated; its button is disabled until a real DMG exists.
+- Page loaders use the full-color mark without visible loading text, with a
+  gentle opacity pulse and reduced-motion support. Incremental loads stay small.
+- LIVE badges use the three palette colors, a static sheen/glow and 3px radius.
+
+## Live Playback Follow-Up
+
+- Active live videos use YouTube-provided remote DASH/HLS manifests rather
+  than the finite VOD SABR generator. Shaka starts at the live edge and tries
+  HLS if an available DASH manifest fails to load.
+- Live manifest URLs encode n challenges in their paths. Resolve these using
+  YouTube.js Player.decipher before loading, preserving unrelated signed URL
+  fields. Log preparation outcomes without exposing full manifest URLs.
+- The first manual live attempt loaded HLS metadata but received HTTP 403 for
+  media segments. After n resolution, the same stream logged nTransformed=true
+  and reached the video element's playing event in about 900ms. No new 403 was
+  seen during the short subsequent observation. This is not a long-duration or
+  all-streams playback guarantee.
+- LIVE thumbnail labels use the shared --wt-live theme variable and 3px
+  rounding. Live tiles do not run VOD storyboard hover previews.
+- References: [YouTube.js streaming data](https://ytjs.dev/api/interfaces/IStreamingData),
+  [Shaka load](https://shaka-project.github.io/shaka-player/docs/api/shaka.Player.html),
+  [yt-dlp manifest challenge handling](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/youtube/_video.py),
+  [PO token requirements](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide).
+- No FreeTube application code copied; no production build or test suite run.
+
+## Current Asset and Notice Closure
+
+- Owner explicitly approved replacing all nine font files with official local
+  Inter/Inter Tight copies. Families/presets and local-only font serving remain
+  unchanged. Pinned/source URLs and SHA-256 receipts: `third-party/sources.json`.
+- Full OFL, Lucide ISC/MIT and Apache license texts are present, including
+  source-adjacent font/icon notices and logo derivative attribution.
+- Installed production/transitive graph plus bundled Shaka/Electron records
+  36 components. Protobuf Apache/BSD, native esbuild/Go and lazy-val's upstream
+  MIT declaration are handled explicitly rather than silently omitted.
+- `pnpm notices` generates readable notices offline in `build/third-party/`,
+  without compiling. Builder runs it before packaging and includes `licenses/`
+  via extraResources. Unreviewed fonts, changed hashes or missing required
+  dependency notices stop preparation. Installed package verification is pending.
+- Concrete current font-origin and notice tasks are closed. Do not restart a
+  generic source investigation for these completed files. Historical files are
+  not certified; the project license remains an owner decision.
+- Notice preparation and source downloads ran; no application build, typecheck,
+  runtime suite, installer, release or push ran. Font changes use renderer HMR.
+- See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for receipts and maintenance.
+
 ## Latest Follow-Up: Previews and Loading
 
 - Video tiles preview after 500ms of mouse hover using native animated images

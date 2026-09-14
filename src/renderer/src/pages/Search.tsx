@@ -2,6 +2,7 @@ import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { VideoCard } from '../components/VideoCard'
+import { PageLoader } from '../components/PageLoader'
 import { RecommendedChannels } from '../components/RecommendedChannels'
 import type { RecommendedChannel, SearchResultItem } from '../../../shared/ipc'
 
@@ -47,7 +48,7 @@ export function Search() {
   }, [query])
 
   if (status === 'idle') return null
-  if (status === 'loading') return <p className="text-sm text-neutral-400">{t("Buscando \"")}{query}{t("\"…")}</p>
+  if (status === 'loading') return <PageLoader />
   if (status === 'error') return <p className="text-sm text-red-400">{error}</p>
 
   if (results.length === 0 && channels.length === 0) {

@@ -114,9 +114,9 @@ function RelatedVideoRow({ video }: { video: SearchResultItem }) {
     <article className="group grid grid-cols-[150px_minmax(0,1fr)] gap-2 rounded p-1 transition-colors hover:bg-neutral-900 max-[480px]:grid-cols-[132px_minmax(0,1fr)]">
       <div className="relative aspect-video rounded bg-neutral-900">
         <Link to={`/watch/${video.videoId}`} className="block h-full w-full overflow-hidden rounded" aria-label={video.title}>
-          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} previewUrl={video.previewUrl} allowPreview />
+          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} previewUrl={video.previewUrl} allowPreview={video.durationText !== 'LIVE'} />
           {video.durationText && (
-            <span className="absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 text-[11px] font-medium leading-none text-white">
+            <span className={`absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 text-[11px] font-medium leading-none text-white ${video.durationText === 'LIVE' ? 'wt-live-badge' : ''}`}>
               {video.durationText}
             </span>
           )}
@@ -300,7 +300,6 @@ export function Watch() {
       </section>
 
       <section className="watch-info-area">
-        {status === 'loading' && <p className="mt-4 text-sm text-neutral-400">{t("Cargando…")}</p>}
         {status === 'error' && <p className="mt-4 text-sm text-red-400">{t(error ?? '')}</p>}
         {status === 'ready' && snapshot.current.videoId === videoId && (
           <div className="watch-info-card">

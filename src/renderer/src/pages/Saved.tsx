@@ -1,6 +1,7 @@
 import { t, useLocale, locale } from '../i18n/LocaleContext'
 import { useEffect, useState } from 'react'
 import { VideoCard } from '../components/VideoCard'
+import { PageLoader } from '../components/PageLoader'
 import { useProfiles } from '../profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { SavedVideo } from '../../../shared/ipc'
@@ -33,7 +34,7 @@ export function Saved() {
     }
   }, [activeProfileId])
 
-  if (videos === null) return <p className="text-sm text-neutral-400">{t("Cargando…")}</p>
+  if (videos === null) return <PageLoader />
 
   return (
     <div>

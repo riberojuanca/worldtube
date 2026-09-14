@@ -107,9 +107,9 @@ export function VideoCard({ videoId, title, channelId, channelName, thumbnailUrl
     <div className={`group flex flex-col gap-2 rounded p-1 hover:bg-neutral-900 ${featured ? 'h-full' : ''}`}>
       <div className={`relative w-full rounded bg-neutral-900 ${portrait ? 'aspect-[9/16]' : 'aspect-video'}`}>
         <Link to={`/watch/${videoId}`} onClick={open} className="block h-full w-full overflow-hidden rounded" aria-label={title}>
-          <VideoThumbnail videoId={videoId} thumbnailUrl={thumbnailUrl} title={title} portrait={portrait} previewUrl={previewUrl} allowPreview />
+          <VideoThumbnail videoId={videoId} thumbnailUrl={thumbnailUrl} title={title} portrait={portrait} previewUrl={previewUrl} allowPreview={badge !== 'LIVE'} />
           {badge && (
-            <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-xs font-medium">
+            <span className={`absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-xs font-medium ${badge === 'LIVE' ? 'wt-live-badge' : ''}`}>
               {badge}
             </span>
           )}

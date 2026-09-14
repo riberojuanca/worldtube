@@ -97,7 +97,10 @@ New home discovery, playlist presentation and responsive channel-row code use
 WorldTube's contracts and upstream parsed models, not FreeTube application
 source as a template. Current scan results do not certify all historical code.
 
-Broader integration provenance, historical commits, font origins, complete
-asset notices, transitive dependencies and installer notice inclusion remain
-open. Keep `DISTRIBUTION_APPROVED` unset; do not choose the root license from
-scan counts alone.
+Current font origins, complete asset notices and the installed transitive
+dependency inventory have since been completed; see LICENSE_REVIEW.md's
+closure section and THIRD_PARTY_NOTICES.md. Builder is configured to include
+notices, but final installer contents still require validation. Historical
+authorship/redistribution questions are not certified by this technical work.
+Keep `DISTRIBUTION_APPROVED` unset; do not choose the root license from scan
+counts alone.

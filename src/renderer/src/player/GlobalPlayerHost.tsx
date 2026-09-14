@@ -80,7 +80,7 @@ export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
  */
 export function GlobalPlayerHost() {
   const { language } = useLocale()
-  const { videoId, dashManifest, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
+  const { videoId, dashManifest, liveManifests, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
   const location = useLocation()
   const navigate = useNavigate()
   const { activeId: activeTabId } = useAppTabs()
@@ -116,8 +116,8 @@ export function GlobalPlayerHost() {
   // from the user's side the video area just stayed black forever with zero
   // feedback. Surfaced here instead.
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [readySource, setReadySource] = useState<{ videoId: typeof videoId; dashManifest: typeof dashManifest; sabr: typeof sabr } | null>(null)
-  const sourceReady = readySource?.videoId === videoId && readySource?.dashManifest === dashManifest && readySource?.sabr === sabr
+  const [readySource, setReadySource] = useState<{ videoId: typeof videoId; dashManifest: typeof dashManifest; liveManifests: typeof liveManifests; sabr: typeof sabr } | null>(null)
+  const sourceReady = readySource?.videoId === videoId && readySource?.dashManifest === dashManifest && readySource?.liveManifests === liveManifests && readySource?.sabr === sabr
   const isInitialLoading = !loadError && (status === 'loading' || (status === 'ready' && !sourceReady))
 
   // Set right before a SABR-triggered reload calls playVideo() again, so the
@@ -367,7 +367,7 @@ export function GlobalPlayerHost() {
       if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) {
         await videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
       }
-      if (!cancelled) setReadySource({ videoId, dashManifest, sabr })
+      if (!cancelled) setReadySource({ videoId, dashManifest, liveManifests, sabr })
     }
 
     // Timing instrumentation only — measures perceived load time (manifest
@@ -380,6 +380,36 @@ export function GlobalPlayerHost() {
       element?.removeEventListener('playing', onPlaying)
     }
     element?.addEventListener('playing', onPlaying)
+
+    if (liveManifests?.length) {
+      const loadLive = async () => {
+        for (let index = 0; index < liveManifests.length; index++) {
+          if (cancelled) return
+          const source = liveManifests[index]
+          try {
+            // An unspecified start time opens at the live edge, not VOD's 0.
+            await player.load(source.url, undefined, source.mimeType)
+            if (cancelled || player.getAssetUri() !== source.url) return
+            setLoadError(null)
+            loadedVideoRef.current = videoId
+            pendingResumeRef.current = null
+            await finishLoading()
+            return
+          } catch (error) {
+            if (cancelled || isLoadInterrupted(error)) return
+            console.warn(`Live manifest failed [video=${videoId}, type=${source.mimeType}]: ${JSON.stringify(describeError(error))}`)
+            if (index === liveManifests.length - 1) {
+              setLoadError(`${t('No se pudo reproducir')}: ${JSON.stringify(describeError(error))}`)
+            }
+          }
+        }
+      }
+      void loadLive()
+      return () => {
+        cancelled = true
+        element?.removeEventListener('playing', onPlaying)
+      }
+    }
 
     if (sabr) {
       const session = startSabrSession(player, sabr.manifest, sabr.stream, {
@@ -462,7 +492,7 @@ export function GlobalPlayerHost() {
       element?.removeEventListener('playing', onPlaying)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashManifest, sabr, videoEl, attachedPlayer])
+  }, [dashManifest, liveManifests, sabr, videoEl, attachedPlayer])
 
   useEffect(() => {
     return () => sabrSessionRef.current?.dispose()

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Download WorldTube, a local-first desktop video client.">
+  <title>WorldTube</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="downloads.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1 class="sr-only">WorldTube</h1>
+    <img class="logo" src="logo.svg" alt="WorldTube" width="660" height="220">
+    <nav class="downloads" aria-label="Download WorldTube">
+      <a class="download" data-platform="windows" aria-disabled="true" title="Checking installer availability"><span aria-hidden="true">↓</span> Windows</a>
+      <a class="download" data-platform="linux" aria-disabled="true" title="Checking installer availability"><span aria-hidden="true">↓</span> Linux</a>
+      <a class="download" data-platform="mac" aria-disabled="true" title="Checking installer availability"><span aria-hidden="true">↓</span> macOS</a>
+    </nav>
+    <p id="release-status" role="status" aria-live="polite">Checking downloads…</p>
+    <noscript><a class="fallback" href="https://github.com/riberojuanca/worldtube/releases">Download from GitHub Releases</a></noscript>
+  </main>
+  <footer><a href="https://github.com/riberojuanca/worldtube">GitHub</a><a href="notices.txt">Notices</a></footer>
+</body>
+</html>

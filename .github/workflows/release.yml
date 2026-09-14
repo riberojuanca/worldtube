@@ -22,12 +22,10 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-      - name: Require distribution approval
-        env:
-          APPROVED: ${{ vars.DISTRIBUTION_APPROVED }}
+      - name: Require license and recorded technical review
         run: |
-          if [ "$APPROVED" != "true" ] || [ ! -f LICENSE ]; then
-            echo "Complete the source/license review, choose LICENSE, then set DISTRIBUTION_APPROVED=true."
+          if [ ! -f LICENSE ] || [ ! -f .github/DISTRIBUTION_REVIEW.md ]; then
+            echo "A project license and recorded technical review are required."
             exit 1
           fi
       - name: Resolve release version
@@ -106,6 +104,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
         run: |
           test -n "$CSC_LINK" && test -n "$CSC_KEY_PASSWORD" && test -n "$APPLE_ID" && test -n "$APPLE_APP_SPECIFIC_PASSWORD" && test -n "$APPLE_TEAM_ID"
       - name: Package signed macOS release
@@ -117,3 +116,20 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+  publish:
+    needs: [prepare, package, mac]
+    if: always() && needs.prepare.result == 'success' && needs.package.result == 'success' && (needs.mac.result == 'success' || needs.mac.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Include corresponding source and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          git archive --format=tar.gz --prefix="WorldTube-$TAG/" HEAD -o "WorldTube-$TAG-source.tar.gz"
+          gh release upload "$TAG" "WorldTube-$TAG-source.tar.gz" --clobber
+          gh release edit "$TAG" --draft=false

@@ -1,5 +1,18 @@
 # Release Closure
 
+## Current Delivery: 2026-09-14
+
+- Owner selected AGPL-3.0-only and requested publication. The actionable
+  technical source review is closed in .github/DISTRIBUTION_REVIEW.md;
+  historical notes below are retained, not active generic blockers.
+- The Pages download site uses the canonical logo, black background and
+  Windows/Linux/macOS buttons driven by actual latest-release assets.
+- Explicit release tags build Windows/Linux; successful enabled jobs publish
+  the release with a corresponding-source archive. No approval variable is
+  needed after this recorded owner decision.
+- Final installer generation/inspection and remote CI results are recorded
+  separately below as they complete. macOS is unavailable without signing.
+
 WorldTube remains a local desktop application. Production readiness here means
 an installable, versioned desktop release with safe local-data handling and an
 update path, not cloud authentication or a hosted application backend.
@@ -19,9 +32,10 @@ work. No installer or production build has been validated in this session.
 
 1. Resolve remaining integration/historical provenance questions in
    LICENSE_REVIEW.md. Current token comparison cannot certify authorship.
-2. Verify bundled font origins and include full applicable font/icon/style
-   notices. Inventory shipped runtime/transitive dependencies and ensure
-   notices actually accompany the installed application.
+2. DONE for current source files: official local fonts, full font/icon/style
+   notices and installed runtime/transitive inventory. Preparation and Builder
+   resource inclusion are configured. Verify the final installer contents in
+   step 4; see THIRD_PARTY_NOTICES.md for the concrete receipt.
 3. Choose the project license with the owner after resolving provenance.
    No default license should be silently assigned.
 4. With the owner's approval for a grouped validation pass, compile/package

@@ -76,7 +76,7 @@ function getLockupDurationText(lockup: LockupView): string | null {
   for (const overlay of overlays) {
     const badges = (overlay as OverlayWithBadges).badges ?? []
     for (const badge of badges) {
-      if (badge.badge_style === 'THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE') return null
+      if (badge.badge_style === 'THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE') return 'LIVE'
       const clock = badge.text?.split(':') ?? []
       if (clock.length < 2 || clock.length > 3) continue
       if (clock.every((part, index) => part.length > 0 && Array.from(part).every((digit) => digit >= '0' && digit <= '9') &&
@@ -186,7 +186,9 @@ function mapVideoNodes(
       channelId: video.author?.id ?? fallbackChannelId,
       channelName: video.author?.name ?? fallbackChannelName,
       thumbnailUrl: (isGridVideo || isCompactMovie ? video.thumbnails?.[0]?.url : video.best_thumbnail?.url) ?? null,
-      durationText: (isGridVideo ? video.duration?.toString() : video.duration.text) ?? null,
+      durationText: ((video instanceof YTNodes.Video || video instanceof YTNodes.CompactVideo) && video.is_live)
+        || (isGridVideo && video.thumbnail_overlays.some((overlay) => overlay instanceof YTNodes.ThumbnailOverlayTimeStatus && overlay.style === 'LIVE'))
+        ? 'LIVE' : (isGridVideo ? video.duration?.toString() : video.duration.text) ?? null,
       viewCountText:
         (isCompactMovie ? null : video.short_view_count?.toString()) ??
         (isGridVideo ? video.views?.toString() : isCompactMovie ? null : video.view_count?.toString()) ??
@@ -693,6 +695,30 @@ function getSubscriberCountText(info: { secondary_info?: { owner?: { subscriber_
   return info.secondary_info?.owner?.subscriber_count?.toString() ?? null
 }
 
+async function prepareLiveManifestUrl(url: string, decipher: (url: string) => Promise<string>): Promise<string> {
+  const manifestUrl = new URL(url)
+  const path = manifestUrl.pathname.split('/')
+  const nIndex = path.indexOf('n')
+  const pathChallenge = nIndex >= 0 ? path[nIndex + 1] : undefined
+  const challenge = pathChallenge ? decodeURIComponent(pathChallenge) : manifestUrl.searchParams.get('n')
+  if (!challenge) return url
+
+  // Player.decipher understands query parameters, while live manifests
+  // encode the same n challenge as /n/value inside their signed URL paths.
+  const challengeUrl = new URL(manifestUrl.origin)
+  challengeUrl.searchParams.set('n', challenge)
+  const solved = new URL(await decipher(challengeUrl.href)).searchParams.get('n')
+  if (!solved || solved === challenge || solved.startsWith('enhanced_except_')) {
+    throw new Error('Could not solve the live manifest n challenge')
+  }
+  if (pathChallenge) {
+    path[nIndex + 1] = encodeURIComponent(solved)
+    manifestUrl.pathname = path.join('/')
+  }
+  if (manifestUrl.searchParams.has('n')) manifestUrl.searchParams.set('n', solved)
+  return manifestUrl.href
+}
+
 async function fetchVideoInfoUncached(videoId: string): Promise<VideoInfoResult> {
   const t0 = performance.now()
   console.log(`[youtube] fetchVideoInfo(${videoId})`)
@@ -734,8 +760,33 @@ async function fetchVideoInfoUncached(videoId: string): Promise<VideoInfoResult>
 
   let manifest: string | null = null
   let sabr: VideoInfoResult['sabr'] = null
+  const isLive = Boolean(info.basic_info.is_live)
+  const liveManifests: NonNullable<VideoInfoResult['liveManifests']> = []
   const tManifestStart = performance.now()
-  if (requiresSabr) {
+  if (isLive) {
+    // Live formats have no VOD segment indexes. Keep YouTube's remote
+    // manifests so Shaka can refresh their moving segment windows.
+    const sources: NonNullable<VideoInfoResult['liveManifests']> = []
+    if (info.streaming_data?.dash_manifest_url) {
+      sources.push({ url: info.streaming_data.dash_manifest_url, mimeType: 'application/dash+xml' })
+    }
+    if (info.streaming_data?.hls_manifest_url) {
+      sources.push({ url: info.streaming_data.hls_manifest_url, mimeType: 'application/x-mpegURL' })
+    }
+    for (const source of sources) {
+      try {
+        const url = await prepareLiveManifestUrl(source.url, async (challengeUrl) => {
+          if (!yt.session.player) throw new Error('No YouTube Player available to solve the live URL challenge')
+          return yt.session.player.decipher(challengeUrl)
+        })
+        liveManifests.push({ ...source, url })
+        console.log(`[youtube] live manifest prepared [video=${videoId}, type=${source.mimeType}, nTransformed=${url !== source.url}]`)
+      } catch (error) {
+        console.error(`[youtube] live manifest preparation failed [video=${videoId}, type=${source.mimeType}]`, error)
+      }
+    }
+    console.log(`[youtube] live manifests available: ${liveManifests.map((source) => source.mimeType).join(', ') || 'none'}`)
+  } else if (requiresSabr) {
     const player = yt.session.player
     if (!player) {
       console.error('[youtube] this video requires SABR streaming, but no Player instance is available to decipher the ABR url')
@@ -780,17 +831,18 @@ async function fetchVideoInfoUncached(videoId: string): Promise<VideoInfoResult>
     channelThumbnailUrl: getChannelThumbnailUrl(info),
     subscriberCountText: getSubscriberCountText(info),
     captions: info.captions ? extractCaptionTracks(info.captions) : [],
-    storyboardVtt: buildStoryboardVtt(info.storyboards, info.basic_info.duration ?? null),
+    storyboardVtt: isLive ? null : buildStoryboardVtt(info.storyboards, info.basic_info.duration ?? null),
     relatedVideos: info.watch_next_feed ? await resolveChannelNames(mapWatchNextFeed(info.watch_next_feed)) : [],
     thumbnailUrl: info.basic_info.thumbnail?.[0]?.url ?? null,
     lengthSeconds: info.basic_info.duration ?? null,
-    durationText: formatDurationText(info.basic_info.duration ?? null),
+    durationText: isLive ? 'LIVE' : formatDurationText(info.basic_info.duration ?? null),
     viewCountText: getViewCountText(info),
     likeCountText: getLikeCountText(info.basic_info.like_count),
     publishedText: getPublishedText(info),
     category: info.basic_info.category,
     description: getDescriptionText(info),
     dashManifest: manifest,
+    liveManifests,
     sabr
   }
 

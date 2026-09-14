@@ -1,5 +1,16 @@
 # Packaging and Updates
 
+## Delivery Update: 2026-09-14
+
+The owner selected AGPL-3.0-only and requested repository/release publication.
+The concrete technical review is complete in .github/DISTRIBUTION_REVIEW.md.
+The old approval-variable steps below are historical and superseded: LICENSE
+and the review record are now required by CI. Successful enabled platform jobs
+publish the draft automatically, with the corresponding-source archive.
+Pages deploys build/site through .github/workflows/pages.yml. If repository
+Pages enablement needs administrator permission, select GitHub Actions under
+Settings > Pages. The website discovers real published release downloads.
+
 Remaining closure tasks and owner decisions: [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ## Current Implementation
@@ -20,6 +31,11 @@ Remaining closure tasks and owner decisions: [RELEASE_CHECKLIST.md](RELEASE_CHEC
   It references this checkout and its icon; register it again if the checkout
   or Node executable moves. It does not install the application or pin the dock.
 - The BotGuard helper is bundled at packaging time and included as a resource.
+- `pnpm notices` prepares complete asset/dependency and Electron/Chromium
+  notices offline, without building. Packaging commands prepare notices before
+  compilation; Builder's `beforePack` hook also covers direct invocations.
+  Results are included as readable `resources/licenses` (macOS:
+  `Contents/Resources/licenses`). Actual installer inclusion awaits validation.
 - The desktop icon reuses the three worlds and gold play mark. Source and PNG,
   ICO, ICNS and Linux sizes live in `resources/`; `pnpm icons` regenerates them
   with electron-builder's icon conversion tool, without building the app.

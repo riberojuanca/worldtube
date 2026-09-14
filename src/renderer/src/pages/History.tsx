@@ -1,6 +1,7 @@
 import { t, useLocale, locale } from '../i18n/LocaleContext'
 import { useEffect, useState } from 'react'
 import { VideoCard } from '../components/VideoCard'
+import { PageLoader } from '../components/PageLoader'
 import { useProfiles } from '../profiles/ProfileContext'
 import type { HistoryEntry } from '../../../shared/ipc'
 
@@ -37,7 +38,7 @@ export function History() {
     setEntries([])
   }
 
-  if (entries === null) return <p className="text-sm text-neutral-400">{t("Cargando…")}</p>
+  if (entries === null) return <PageLoader />
 
   return (
     <div>

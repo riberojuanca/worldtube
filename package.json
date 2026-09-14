@@ -1,6 +1,7 @@
 {
   "name": "worldtube",
   "private": true,
+  "license": "AGPL-3.0-only",
   "version": "0.0.1",
   "description": "A local-first YouTube desktop client with persistent playback and independent tabs.",
   "author": "riberojuanca",
@@ -17,8 +18,10 @@
     "build": "electron-vite build",
     "icons": "node scripts/generate-icons.cjs",
     "desktop:install": "node scripts/install-dev-desktop.cjs",
-    "package": "pnpm build && node scripts/bundle-botguard.mjs && electron-builder --publish never",
-    "release": "pnpm build && node scripts/bundle-botguard.mjs && electron-builder --publish always",
+    "notices": "node scripts/prepare-third-party-notices.mjs",
+    "site": "node scripts/prepare-site.mjs",
+    "package": "corepack pnpm notices && corepack pnpm build && node scripts/bundle-botguard.mjs && electron-builder --publish never",
+    "release": "corepack pnpm notices && corepack pnpm build && node scripts/bundle-botguard.mjs && electron-builder --publish always",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },

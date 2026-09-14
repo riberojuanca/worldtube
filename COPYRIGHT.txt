@@ -1,0 +1,12 @@
+WorldTube
+Copyright (c) 2026 Juanca Ribero
+
+WorldTube's own code is licensed under GNU Affero General Public License
+version 3 only (SPDX: AGPL-3.0-only). See LICENSE for the complete terms.
+
+Third-party libraries, fonts, icons and styles retain their own copyrights
+and licenses. See THIRD_PARTY_NOTICES.md and the installed licenses directory.
+
+Corresponding source and build instructions:
+https://github.com/riberojuanca/worldtube
+Each published version has a matching source tag and GitHub source archive.

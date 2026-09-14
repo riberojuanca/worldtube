@@ -1,4 +1,5 @@
 import { t, useLocale } from '../i18n/LocaleContext'
+import { PageLoader } from '../components/PageLoader'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type {
   CreateLocalUserRequest,
@@ -259,7 +260,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }
 
   if (!state) {
-    return <div className="grid min-h-screen place-items-center bg-neutral-950 text-sm text-neutral-400">{t("Cargando sesión…")}</div>
+    return <div className="bg-neutral-950"><PageLoader fullScreen /></div>
   }
 
   if (state.setupRequired) {

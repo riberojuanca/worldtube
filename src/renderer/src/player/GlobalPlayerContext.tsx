@@ -1,6 +1,6 @@
 import { t, useLocale } from '../i18n/LocaleContext'
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { CaptionTrack, SabrManifestInfo, SabrStreamInfo, SearchResultItem } from '../../../shared/ipc'
+import type { CaptionTrack, SabrManifestInfo, SabrStreamInfo, SearchResultItem, VideoInfoResult } from '../../../shared/ipc'
 
 export interface GlobalPlayerState {
   videoId: string | null
@@ -20,6 +20,7 @@ export interface GlobalPlayerState {
   storyboardVtt: string | null
   relatedVideos: SearchResultItem[]
   dashManifest: string | null
+  liveManifests: NonNullable<VideoInfoResult['liveManifests']> | null
   sabr: { manifest: SabrManifestInfo; stream: SabrStreamInfo } | null
   status: 'idle' | 'loading' | 'ready' | 'error'
   error: string | null
@@ -52,6 +53,7 @@ export const initialState: GlobalPlayerState = {
   storyboardVtt: null,
   relatedVideos: [],
   dashManifest: null,
+  liveManifests: null,
   sabr: null,
   status: 'idle',
   error: null
@@ -95,7 +97,7 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   const playVideoImpl = useCallback(async (videoId: string) => {
     const requestId = ++requestIdRef.current
 
-    setState((prev) => ({ ...prev, videoId, status: 'loading', error: null, dashManifest: null, sabr: null }))
+    setState((prev) => ({ ...prev, videoId, status: 'loading', error: null, dashManifest: null, liveManifests: null, sabr: null }))
 
     const response = await window.api.getVideoInfo(videoId)
     if (requestIdRef.current !== requestId) return
@@ -105,7 +107,7 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
       return
     }
 
-    if (!response.data.dashManifest && !response.data.sabr) {
+    if (!response.data.dashManifest && !response.data.sabr && !response.data.liveManifests?.length) {
       setState((prev) => ({
         ...prev,
         title: response.data.title,
@@ -124,6 +126,7 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
         storyboardVtt: response.data.storyboardVtt,
         relatedVideos: response.data.relatedVideos,
         dashManifest: null,
+        liveManifests: null,
         sabr: null,
         status: 'error',
         error: t("No se pudo generar un manifest reproducible para este video (ver logs del proceso principal).")
@@ -149,6 +152,7 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
       storyboardVtt: response.data.storyboardVtt,
       relatedVideos: response.data.relatedVideos,
       dashManifest: response.data.dashManifest,
+      liveManifests: response.data.liveManifests?.length ? response.data.liveManifests : null,
       sabr: response.data.sabr,
       status: 'ready',
       error: null

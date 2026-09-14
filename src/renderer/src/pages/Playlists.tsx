@@ -6,6 +6,7 @@ import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { SavedPlaylist, SavedVideo } from '../../../shared/ipc'
 import { VideoThumbnail } from '../components/VideoCard'
 import { NavigationIcon } from '../components/NavigationIcon'
+import { PageLoader } from '../components/PageLoader'
 
 function formatUpdatedAt(timestampMs: number): string {
   if (!timestampMs) return t("Sin fecha")
@@ -101,7 +102,7 @@ export function Playlists() {
     finally { setBusy(false) }
   }
 
-  if (playlists === null) return <p className="text-sm text-neutral-400">{t("Cargando…")}</p>
+  if (playlists === null) return <PageLoader />
 
   return (
     <section>

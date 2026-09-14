@@ -1,0 +1,126 @@
+{
+  "notices": [
+    {
+      "file": "third-party/Inter-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/809e4d8b8d7e9364a914909bb777679606c178b8/ofl/inter/OFL.txt",
+      "sha256": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57"
+    },
+    {
+      "file": "third-party/InterTight-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/809e4d8b8d7e9364a914909bb777679606c178b8/ofl/intertight/OFL.txt",
+      "sha256": "50240ab035cf1b6b3307940235481d515c4b6de3ab1fa843dbe59e7892cb9d58"
+    },
+    {
+      "file": "third-party/Lucide-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/a79b2d131dab2bf20cb224bd0937b439a9c4fa99/LICENSE",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+    },
+    {
+      "file": "third-party/Pictogrammers-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/Templarian/MaterialDesign/2424e748e0cc63ab7b9c095a099b9fe239b737c0/LICENSE",
+      "sha256": "3bae6305bcaa6d10219b999f65c342034c2d40b1c0e8567fa08605e73ccba829"
+    },
+    {
+      "file": "third-party/Apache-2.0.txt",
+      "source": "https://raw.githubusercontent.com/apache/.github/66951150d5f712b03655139a4383a08b9b0cb2c6/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "file": "third-party/lazy-val-package.json",
+      "source": "https://raw.githubusercontent.com/develar/lazy-val/b69ad4119f1b19bdab13c61ee2fcc88d46b89071/package.json",
+      "sha256": "a642078ae0684963e5747e9499487a4c649c150bbddbfdfd8eb357bfcbf9c1c2"
+    },
+    {
+      "file": "third-party/protobuf-2.15.0-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/bufbuild/protobuf-es/f72f5295c853b7be8c0828f350e4f2803c8afdde/LICENSE",
+      "sha256": "c04b4216f1cd4c5a4f7fb2f2a1b0ae70d847e9e0cac7c9dee9bf8cc03177c449"
+    },
+    {
+      "file": "third-party/Go-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/golang/go/97c8ff8d53759e7a82b1862403df1694f2b6e073/LICENSE",
+      "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+    }
+  ],
+  "fonts": [
+    {
+      "file": "src/renderer/src/assets/fonts/inter-cyrillic-ext.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2",
+      "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/inter-cyrillic.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7SUc.woff2",
+      "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/inter-symbols.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7SUc.woff2",
+      "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/inter-greek.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2",
+      "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/inter-vietnamese.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2pL7SUc.woff2",
+      "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/inter-latin-ext.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7SUc.woff2",
+      "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/inter-latin.woff2",
+      "source": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+      "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/InterTight-VariableFont_wght.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/fac60545cc0de9d4eff6eb5b1ab88bcdfc9ecc69/ofl/intertight/InterTight%5Bwght%5D.ttf",
+      "sha256": "b81b73dcb64df3c230cabade7df6c5773bf863233f24c9ee51087519f1f88b6f",
+      "verification": "byte-identical"
+    },
+    {
+      "file": "src/renderer/src/assets/fonts/InterTight-Italic-VariableFont_wght.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/fac60545cc0de9d4eff6eb5b1ab88bcdfc9ecc69/ofl/intertight/InterTight-Italic%5Bwght%5D.ttf",
+      "sha256": "15d3edf0c3d2560658529b8c4c7398d06c730a4695484c680b6c9ca9e4385be2",
+      "verification": "byte-identical"
+    }
+  ],
+  "icons": [
+    {
+      "file": "src/renderer/src/assets/icons/earth.svg",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/a79b2d131dab2bf20cb224bd0937b439a9c4fa99/icons/earth.svg",
+      "sha256": "418c26c92b4aff01c9c616c347216f1dbab3d766200b5927b3db6d27e08dc17c",
+      "verification": "matching upstream path geometry; wrapper customized"
+    },
+    {
+      "file": "src/renderer/src/assets/icons/globe.svg",
+      "source": "https://raw.githubusercontent.com/lucide-icons/lucide/a79b2d131dab2bf20cb224bd0937b439a9c4fa99/icons/globe.svg",
+      "sha256": "d25e55999b104f555f71e2ec56c8a487bd1d713efd5399b1e692e2f03e31b2e4",
+      "verification": "matching upstream path geometry; wrapper customized"
+    },
+    {
+      "file": "src/renderer/src/assets/icons/world-solid.svg",
+      "source": "https://raw.githubusercontent.com/Templarian/MaterialDesign/2424e748e0cc63ab7b9c095a099b9fe239b737c0/svg/earth.svg",
+      "sha256": "ec6f66a18fc54b709d05f5d2a1ff21987fb97e1e13136c417b65082d76e4b659",
+      "verification": "matching upstream path geometry; wrapper customized"
+    }
+  ],
+  "unresolvedFonts": [],
+  "fontCatalog": {
+    "source": "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "sha256": "21ac92c461b8f77ba46f76b2390794e0ee32fca30ffd9d5ea8af90391733ed59"
+  }
+}

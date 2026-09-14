@@ -7,16 +7,20 @@ and a movable mini player. Not affiliated with Google or YouTube.
 
 ## Installation
 
-WorldTube is under development. No installers have been built or published by
-this implementation yet. Windows, Linux and macOS are distribution targets, not
-currently validated platforms.
+Download installers from the [WorldTube download page](https://riberojuanca.github.io/worldtube/)
+or [GitHub Releases](https://github.com/riberojuanca/worldtube/releases).
+Downloads become available only after a release is successfully published.
 
 The release configuration prepares Windows NSIS x64 and Linux AppImage/DEB x64.
 macOS DMG/ZIP ARM64 is opt-in and requires signing credentials. See
 [Packaging and Updates](docs/UPDATES.md) for setup and outstanding work.
 
-Future installers and release notes will be available under
-[GitHub Releases](https://github.com/riberojuanca/worldtube/releases).
+Windows: download the x64 `.exe` and follow the installer.
+Linux: download the x64 `.AppImage`, make it executable (`chmod +x WorldTube-*.AppImage`),
+then run it. Debian/Ubuntu users can instead install the `.deb` from Releases.
+AppImage may require FUSE 2; `--appimage-extract-and-run` is an alternative on
+systems without it. Windows packages are initially unsigned; verify the source
+and download location. macOS downloads remain unavailable until signed builds exist.
 
 ## Features
 
@@ -75,6 +79,8 @@ pnpm dev
 
 `pnpm build` compiles the app only. `pnpm package` creates local installers.
 `pnpm release` packages and uploads a draft release; use it only intentionally.
+The version-tag workflow publishes after all enabled packaging jobs succeed,
+including a matching corresponding-source archive. Failed jobs leave a draft.
 Ordinary commits do not trigger release builds.
 
 During collaborative iterations, builds, typechecks and automated test suites
@@ -98,6 +104,9 @@ Earlier technical documents contain Spanish development history.
 
 ## License
 
-The project license has not been selected. Source/provenance review is pending,
-including identified similarities with FreeTube Lab and third-party asset
-notices. See [Source and License Review](docs/LICENSE_REVIEW.md).
+WorldTube's own code is licensed under [AGPL-3.0-only](LICENSE).
+Copyright (c) 2026 Juanca Ribero. Third-party notices and official local font
+origins are recorded in [Third-Party Notices](THIRD_PARTY_NOTICES.md).
+The actionable technical review is closed in
+[Distribution Review](.github/DISTRIBUTION_REVIEW.md); historical findings remain
+recorded in [Source Review](docs/LICENSE_REVIEW.md).

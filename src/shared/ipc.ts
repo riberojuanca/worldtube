@@ -390,6 +390,8 @@ export interface VideoInfoResult {
    * when generation failed, or when the video needs SABR (see `sabr` below).
    */
   dashManifest: string | null
+  /** YouTube-provided live manifests, in playback/fallback order. */
+  liveManifests?: { url: string; mimeType: 'application/dash+xml' | 'application/x-mpegURL' }[]
   /**
    * Set instead of `dashManifest` when YouTube requires the SABR/UMP
    * streaming protocol for this video (most current videos). `null` when the

@@ -1,7 +1,10 @@
 # WorldTube
 
 Cliente local de escritorio para YouTube, desarrollado usando FreeTube Lab como referencia.
-La revisión de procedencia y licencias sigue pendiente; ver [LICENSE_REVIEW](docs/LICENSE_REVIEW.md).
+Las fuentes actuales tienen origen oficial local y los avisos de terceros están
+completados; ver [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md). La licencia general,
+WorldTube usa AGPL-3.0-only. La revisión técnica concreta está cerrada en
+[Distribution Review](.github/DISTRIBUTION_REVIEW.md); no constituye una certificación legal.
 
 El [README principal en inglés](README.md) contiene el estado actual de empaquetado y
 actualizaciones. Este documento conserva los detalles de desarrollo previos en español.
@@ -10,7 +13,9 @@ No afiliado a Google/YouTube. Nombre provisional.
 
 ## Instalación
 
-**En desarrollo: todavía no hay instaladores de WorldTube generados por este repo.**
+Descargas: [WorldTube](https://riberojuanca.github.io/worldtube/) y
+[GitHub Releases](https://github.com/riberojuanca/worldtube/releases).
+Los botones se habilitan cuando exista un instalador publicado.
 Los comandos de abajo son para ejecutar desde el código, no una instalación para
 usuarios finales. Compilar con `pnpm build` tampoco genera un instalador.
 
@@ -23,7 +28,9 @@ por esta sesión. Formatos propuestos y trabajo pendiente en
 
 ## Forma de trabajo
 
-Cuando una funcionalidad ya existe en `../freetube-audio-lab`, el flujo correcto es:
+Los siguientes pasos conservan el flujo histórico previo; están reemplazados
+por implementar desde los contratos de WorldTube y las APIs/documentación
+oficiales, sin usar código de aplicación de FreeTube como plantilla:
 
 1. Revisar el código original de FreeTube Lab.
 2. Entender el patrón exacto y el orden de inicialización.

@@ -1,14 +1,24 @@
 appId: com.riberojuanca.worldtube
 productName: WorldTube
+artifactName: WorldTube-${version}-${os}-${arch}.${ext}
+beforePack: ./scripts/prepare-third-party-notices.cjs
 directories:
   output: release
   buildResources: resources
 files:
   - out/**/*
   - package.json
+  - LICENSE
+  - COPYRIGHT.txt
 asarUnpack:
   - node_modules/@esbuild/**/*
 extraResources:
+  - from: LICENSE
+    to: licenses/WorldTube-LICENSE.txt
+  - from: COPYRIGHT.txt
+    to: licenses/WorldTube-COPYRIGHT.txt
+  - from: build/third-party
+    to: licenses
   - from: resources/botguard-preload.cjs
     to: botguard-preload.cjs
   - from: resources/icon.png

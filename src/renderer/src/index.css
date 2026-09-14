@@ -82,6 +82,9 @@
   --wt-accent: var(--wt-palette-3);
   --wt-accent-hover: var(--wt-palette-2);
   --wt-accent-text: color-mix(in srgb, var(--wt-accent) 45%, white);
+  --wt-live: var(--wt-palette-3);
+  --wt-live-gradient: linear-gradient(120deg, var(--wt-palette-1), var(--wt-palette-2) 45%, var(--wt-palette-3));
+  --wt-live-glow: color-mix(in srgb, var(--wt-palette-3) 45%, transparent);
   --wt-accent-soft: color-mix(in srgb, var(--wt-accent) 20%, transparent);
   --wt-on-accent: #ffffff;
   --wt-important: var(--wt-palette-4);
@@ -258,6 +261,15 @@ video,
   background-color: var(--wt-selection-hover);
 }
 
+.wt-live-badge {
+  background-color: var(--wt-live);
+  background-image: linear-gradient(120deg, transparent 20%, rgb(255 255 255 / 16%) 42%, transparent 64%), var(--wt-live-gradient);
+  color: var(--wt-on-accent);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 0 8px var(--wt-live-glow);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+}
+
 .wt-accent-text,
 .wt-link,
 button[data-saved='true'] {
@@ -281,6 +293,33 @@ button[data-saved='true'] {
 
 input[type='checkbox'] {
   accent-color: var(--wt-accent);
+}
+
+.wt-page-loader {
+  display: grid;
+  min-height: calc(100dvh - 144px);
+  width: 100%;
+  place-items: center;
+}
+
+.wt-page-loader-full { min-height: 100dvh; }
+.wt-page-loader-compact { min-height: 48px; }
+
+.wt-page-loader-mark {
+  display: inline-flex;
+  transform: scale(1.5);
+  animation: wt-page-loader-glow 2.6s ease-in-out infinite;
+}
+
+.wt-page-loader-compact .wt-page-loader-mark { transform: none; }
+
+@keyframes wt-page-loader-glow {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wt-page-loader-mark { animation: none; }
 }
 
 .wt-brand-worlds {

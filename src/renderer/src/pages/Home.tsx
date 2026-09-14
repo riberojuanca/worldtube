@@ -1,6 +1,7 @@
 import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useMemo, useState } from 'react'
 import { VideoCard } from '../components/VideoCard'
+import { PageLoader } from '../components/PageLoader'
 import { useProfiles } from '../profiles/ProfileContext'
 import { RecommendedChannels } from '../components/RecommendedChannels'
 import type { HomeDiscovery, SearchResultItem } from '../../../shared/ipc'
@@ -53,16 +54,7 @@ export function Home() {
   return (
     <section aria-label={t('Inicio')} aria-busy={feedStatus === 'loading'}>
       <h1 className="mb-4 text-xl font-semibold">{t('Inicio')}</h1>
-      {feedStatus === 'loading' && <>
-        <span className="sr-only" role="status">{t('Cargando inicio…')}</span>
-        <div aria-hidden="true" className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 12 }, (_, index) => <div key={index} className="motion-safe:animate-pulse">
-            <div className="aspect-video w-full rounded bg-neutral-900" />
-            <div className="mt-3 h-4 w-4/5 rounded bg-neutral-800" />
-            <div className="mt-2 h-3 w-1/2 rounded bg-neutral-900" />
-          </div>)}
-        </div>
-      </>}
+      {feedStatus === 'loading' && <PageLoader />}
       {feedStatus === 'error' && <div role="alert" className="border-y border-neutral-800 py-6">
         <p className="mb-3 text-sm text-red-400">{feedError}</p>
         <button type="button" onClick={() => setAttempt((value) => value + 1)} className="wt-action cursor-pointer rounded px-4 py-2 text-sm font-medium">{t('Retry')}</button>

@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { ChannelAvatar } from '../components/ChannelAvatar'
 import { SubscribeButton } from '../components/SubscribeButton'
 import { VideoCard } from '../components/VideoCard'
+import { PageLoader } from '../components/PageLoader'
 import { useProfiles } from '../profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { ChannelInfoResult, ChannelPageResult, ChannelPlaylistItem, ChannelTab, SearchResultItem } from '../../../shared/ipc'
@@ -194,7 +195,7 @@ export function Channel() {
   }
 
   if (headerError) return <p role="alert" className="text-sm text-red-400">{headerError}</p>
-  if (!channel) return <p className="text-sm text-neutral-400">{t("Cargando canal...")}</p>
+  if (!channel) return <PageLoader />
   const empty = page && !page.about && page.videos.length === 0 && page.playlists.length === 0 && page.posts.length === 0 && page.sections.length === 0
 
   return <div className="min-w-0">
@@ -227,6 +228,7 @@ export function Channel() {
       </button>)}
     </div>
     <div id="channel-content" role="tabpanel" aria-labelledby={`channel-tab-${tab}`} aria-busy={loading}>
+      {loading && !page && <PageLoader />}
       {playlistId && <div className="mb-5 flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => changeTab(tab)} className="rounded bg-neutral-800 px-3 py-2 text-sm hover:bg-neutral-700">{t("Volver")}</button>
         <h2 className="min-w-0 break-words text-lg font-semibold">{params.get('title') || 'Playlist'}</h2>
@@ -277,7 +279,7 @@ export function Channel() {
         {page?.continuation && <button type="button" onClick={() => { cache.current.delete(pageKey); setRetry((value) => value + 1) }} className="rounded bg-neutral-800 px-3 py-2 text-neutral-200">{t("Recargar seccion")}</button>}
       </div>}
       <div ref={sentinel} className="mt-6 flex min-h-12 justify-center">
-        {loading ? <p role="status" className="text-sm text-neutral-400">{t("Cargando...")}</p> : page?.continuation && automaticLoads >= 3 && <button type="button" onClick={() => void loadMore()} className="rounded bg-neutral-800 px-4 py-2 text-sm hover:bg-neutral-700">{t("Cargar mas")}</button>}
+        {loading ? page && <PageLoader compact /> : page?.continuation && automaticLoads >= 3 && <button type="button" onClick={() => void loadMore()} className="rounded bg-neutral-800 px-4 py-2 text-sm hover:bg-neutral-700">{t("Cargar mas")}</button>}
       </div>
     </div>
   </div>

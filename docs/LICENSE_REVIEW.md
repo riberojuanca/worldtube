@@ -1,10 +1,51 @@
 # Source and License Review
 
+## Current Closure: 2026-09-14
+
+The actionable technical review is complete: see
+[Distribution Review](../.github/DISTRIBUTION_REVIEW.md). No additional concrete
+copied application block was identified in the current reviewed integration
+scope. The owner selected AGPL-3.0-only and explicitly requested publication.
+LICENSE and COPYRIGHT.txt are now included with installers and corresponding
+source archives. No blanket independent-authorship/legal certification is made.
+The older status and remaining-work sections below preserve historical findings;
+they do not reopen completed current font/notice/replacement work.
+
 Status: technical comparison and four targeted replacements recorded on
 2026-09-13; NOT cleared for distribution or independent authorship certification.
 See [replacement details and sources](PROVENANCE_REPLACEMENTS.md).
 WorldTube does not yet have a chosen project LICENSE. No project license was
 assigned as part of packaging setup, and release CI is gated on approval.
+
+## Concrete Asset and Notice Closure
+
+Completed in the follow-up of 2026-09-13. The owner authorized replacing the
+nine local font files whose bytes could not be matched to consulted upstream
+versions. All nine are now unmodified official local copies of Inter/Inter Tight,
+with source URLs and SHA-256 hashes in `third-party/sources.json`. This resolves
+the CURRENT font files' origin; it does not authenticate removed historical files.
+
+Full font OFL, Lucide ISC/MIT and Apache texts are saved in `third-party/` and
+font/icon notices also sit beside source assets. The application logo's earth
+geometry is explicitly attributed to Pictogrammers, including derived installers'
+icons and monochrome buffering artwork. No SF files are included.
+
+An installed dependency traversal recorded 36 runtime/bundled components in
+`third-party/dependencies.json`, including transitive packages, bundled Shaka
+and Electron. Full npm notices, omitted-file cases, the Protobuf BSD notice,
+Go runtime notice and Electron/Chromium notices are prepared by an offline step.
+See [Third-Party Notices](../THIRD_PARTY_NOTICES.md) for exact fallback handling.
+
+`pnpm notices` prepares readable installed notices without compiling. Builder's
+`beforePack` hook repeats preparation for direct invocations; `extraResources`
+copies the results to installed `licenses/`. Hash changes, unreviewed added
+fonts, missing required texts/packages and unsupported fallback versions fail
+explicitly. Actual final installer contents still await package validation.
+
+The concrete missing-font-origin and incomplete-notice tasks are CLOSED in the
+current tree. A project license decision, final package validation and historical
+authorship/redistribution questions are separate remaining surfaces; do not keep
+reporting the completed asset work as a new generic review blocker.
 
 ## Scope and Method
 
@@ -99,16 +140,15 @@ distribution. Superficial renaming or deleting references is not a solution.
   Fialho MIT notices. Preserve both notices.
 - Local Lucide and Pictogrammers icons have notice files alongside the assets.
   Confirm that the complete required license texts accompany distributions.
-- Inter and Inter Tight fonts are bundled locally. Their precise file origins,
-  font metadata and accompanying OFL notices must be checked before release.
-  The source directories currently have no font license file.
-  `fc-scan` identifies the sampled WOFF2 as Inter and the variable TTF as
-  Inter Tight; family metadata does not authenticate a file's origin/license.
+- Inter and Inter Tight fonts are bundled locally. Initially, `fc-scan` family
+  metadata did not authenticate their origin and no OFL files were present.
+  The current files have been replaced with official copies and full notices,
+  as described in the closure section above. Historical copies are not certified.
   Official notices: [Inter](https://github.com/rsms/inter/blob/master/LICENSE.txt)
   and [Inter Tight](https://github.com/google/fonts/blob/main/ofl/intertight/OFL.txt).
-- `LICENSE-PICTOGRAMMERS.txt` describes licensing and links Apache-2.0 but does
-  not contain its complete text. Add the applicable complete upstream notices
-  for the SVG and derived application PNG/ICO/ICNS assets before packaging.
+- `LICENSE-PICTOGRAMMERS.txt` describes licensing and links Apache-2.0. The
+  complete Apache text is now included separately next to icons and in installed
+  notices, with explicit SVG/application PNG/ICO/ICNS attribution.
   The application mark includes the same Pictogrammers earth path as the UI.
 - Runtime and development dependencies have their own licenses. Packaging a
   dependency does not make it WorldTube-owned source.
@@ -134,8 +174,9 @@ distribution. Superficial renaming or deleting references is not a solution.
    is not automatically a clean-room implementation or legal clearance.
 3. Preserve Git history and correct blanket authorship claims. Current files
    and already existing commits are separate distribution surfaces.
-4. Establish font origins, include complete asset notices, inventory transitive
-   runtime dependencies and verify that required notices reach installers.
+4. Font origins, asset texts and the installed transitive dependency inventory
+   are complete for the current tree. Verify notice/resource inclusion in an
+   actual installer in the grouped package validation pass.
 5. Choose the project license with the repository owner only after resolving
    provenance. Do not assign a root LICENSE as part of this inspection.
 

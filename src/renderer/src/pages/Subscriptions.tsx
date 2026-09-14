@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChannelAvatar } from '../components/ChannelAvatar'
 import { VideoCard } from '../components/VideoCard'
+import { PageLoader } from '../components/PageLoader'
 import { useProfiles } from '../profiles/ProfileContext'
 import type { SearchResultItem, Subscription } from '../../../shared/ipc'
 
@@ -41,7 +42,7 @@ export function Subscriptions() {
     }
   }, [activeProfileId])
 
-  if (subs === null) return <p className="text-sm text-neutral-400">{t("Cargando…")}</p>
+  if (subs === null) return <PageLoader />
 
   if (subs.length === 0) {
     return (
@@ -68,7 +69,7 @@ export function Subscriptions() {
         ))}
       </div>
 
-      {feedStatus === 'loading' && <p className="text-sm text-neutral-400">{t("Cargando videos…")}</p>}
+      {feedStatus === 'loading' && <PageLoader />}
       {feedStatus === 'error' && <p className="text-sm text-red-400">{feedError}</p>}
       {feedStatus === 'ready' && feed.length === 0 && (
         <p className="text-sm text-neutral-400">{t("Ninguno de tus canales suscriptos tiene videos disponibles.")}</p>
