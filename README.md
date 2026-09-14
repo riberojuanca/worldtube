@@ -5,6 +5,10 @@ and a movable mini player. Not affiliated with Google or YouTube.
 
 [Spanish development notes](README.es.md)
 
+## Demo
+
+Watch the short [WorldTube demo on YouTube](https://youtu.be/ccULEv3KD28).
+
 ## Installation
 
 Download installers from the [WorldTube download page](https://riberojuanca.github.io/worldtube/)

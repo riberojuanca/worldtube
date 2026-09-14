@@ -46,6 +46,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 #copy-command:disabled { opacity: .5; cursor: not-allowed; }
 #copy-status { margin: 8px 12px; font-size: 12px; color: #aaa; }
 #release-status { margin: 20px 0 0; min-height: 20px; color: #929292; font-size: 12px; text-align: center; }
+.demo-link { margin: 8px 0 0; text-align: center; }
+.demo-link a { color: #aaa; font-size: 13px; text-underline-offset: 3px; }
+.demo-link a:hover { color: #fff; }
 .installation-guide { width: 100%; max-width: 660px; min-width: 0; margin: 48px auto 0; color: #aaa; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .installation-guide > h2 { text-align: center; }
 .installation-guide h3 { color: #fff; font-size: 14px; margin-top: 24px; }

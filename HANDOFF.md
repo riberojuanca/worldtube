@@ -15,6 +15,8 @@
 - Development server and its Electron window were stopped at owner request;
   the installed /opt/WorldTube application was left running. No local build or
   automated UI test was added during this release and site correction work.
+- Owner supplied the public demo video https://youtu.be/ccULEv3KD28. It is now
+  linked from README and the download page without embedding or autoplaying it.
 - Future self-hosted desktop/mobile synchronization is recorded as a proposal
   in [docs/FUTURE_SYNC.md](docs/FUTURE_SYNC.md), not an implemented feature or
   a prerequisite for today's distribution. No backend or container was created.
