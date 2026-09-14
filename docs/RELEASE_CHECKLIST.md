@@ -2,6 +2,10 @@
 
 ## Current Delivery: 2026-09-14
 
+- Download website is live: https://riberojuanca.github.io/worldtube/ (successful
+  Pages workflow and HTTP 200). Linux installers were generated locally with
+  expected resources/notices. Windows/Linux release CI failed, so no public
+  installer release or updater cycle is claimed yet.
 - Owner selected AGPL-3.0-only and requested publication. The actionable
   technical source review is closed in .github/DISTRIBUTION_REVIEW.md;
   historical notes below are retained, not active generic blockers.

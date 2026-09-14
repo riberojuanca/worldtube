@@ -11,6 +11,10 @@
   First release CI failed on Linux packaging and Windows Corepack installation;
   do not describe the draft as published. Download buttons remain unavailable
   until real public release assets exist.
+- After the owner selected GitHub Actions under repository Pages settings,
+  Pages run 34801784934 completed successfully. The download site at
+  https://riberojuanca.github.io/worldtube/ responded HTTP 200. Installer
+  publication is separate and remains blocked on the failed release jobs.
 
 - Owner selected AGPL-3.0-only, requested no further feature work and authorized
   repository, Pages and installer publication. LICENSE/COPYRIGHT.txt are added
