@@ -2,7 +2,7 @@ TITLE
 WorldTube – an AGPL desktop video client with tabs and a persistent mini player
 
 TEXT
-I built WorldTube, an AGPL-licensed local-first desktop video client for Windows and Linux.
+I built WorldTube, an AGPL-licensed local-first desktop video client for watching YouTube content on Windows and Linux. It is intended as an open-source desktop alternative for people who want a more local, flexible way to use YouTube.
 
 It includes:
 
