@@ -2,7 +2,12 @@
 
 Current packaging and updater implementation: [UPDATES.md](UPDATES.md).
 The Spanish research below predates that implementation and is retained as
-history. No installers or update cycle have been validated yet.
+history. Current delivery status is recorded in [HANDOFF.md](../HANDOFF.md):
+v0.0.4 is public with Windows x64 EXE and Linux x64 DEB/AppImage installers.
+The owner confirmed Windows and Ubuntu installation, and the Windows startup
+update notice appeared. Full updater installation/restart is not yet confirmed.
+Pages provides direct downloads and visible Ubuntu installation/copy commands.
+Flatpak/Flathub remains intentionally out of scope for this delivery.
 
 ## Previous Research
 

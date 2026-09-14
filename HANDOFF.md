@@ -1,6 +1,28 @@
 # WorldTube: Current Implementation
 
+## End-of-Day Closure: 2026-09-14
+
+- v0.0.4 is public: release workflow 34803980288 passed Windows and Linux
+  packaging and publication. latest.yml was fetched and reports version 0.0.4
+  with WorldTube-0.0.4-win-x64.exe. Source tag: f42052e.
+- Owner confirmed installation works on Windows and Ubuntu x86_64. The Windows
+  startup update notice eventually appeared; installation of that update has
+  not yet been explicitly confirmed. Do not claim the full updater cycle passed.
+- Download-page correction 162f2de deployed successfully in run 34804395736:
+  direct Linux DEB link, separate AppImage link, visible installation commands
+  and clipboard button in the guide, explicit Ubuntu terminal/paste steps,
+  centered 660px maximum text width and versioned CSS/JS references.
+- Development server and its Electron window were stopped at owner request;
+  the installed /opt/WorldTube application was left running. No local build or
+  automated UI test was added during this release and site correction work.
+- Future self-hosted desktop/mobile synchronization is recorded as a proposal
+  in [docs/FUTURE_SYNC.md](docs/FUTURE_SYNC.md), not an implemented feature or
+  a prerequisite for today's distribution. No backend or container was created.
+
 ## Version 0.0.4: First-Use Corrections
+
+The preparation notes below are historical; the closure above supersedes their
+pending publication/deployment statements.
 
 - Owner chose to keep DEB/AppImage distribution without Flatpak/Flathub.
   Pages now offers a Linux format chooser, latest-release DEB terminal commands
