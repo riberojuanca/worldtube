@@ -16,10 +16,47 @@
     <img class="logo" src="logo.svg" alt="WorldTube" width="660" height="220">
     <nav class="downloads" aria-label="Download WorldTube">
       <a class="download" data-platform="windows" aria-disabled="true" title="Checking installer availability"><span aria-hidden="true">↓</span> Windows</a>
-      <a class="download" data-platform="linux" aria-disabled="true" title="Checking installer availability"><span aria-hidden="true">↓</span> Linux</a>
+      <details class="linux-downloads">
+        <summary class="download"><span aria-hidden="true">↓</span> Linux</summary>
+        <div class="linux-options">
+          <a class="linux-option" data-platform="linux" aria-disabled="true">Ubuntu / Debian · DEB</a>
+          <p class="install-note">Recommended for Ubuntu, Debian and Linux Mint on Intel / AMD 64-bit computers.</p>
+          <a class="linux-option" data-platform="linux-appimage" aria-disabled="true">Portable · AppImage</a>
+          <details class="terminal-install">
+            <summary class="linux-option">Terminal · Ubuntu / Debian x64</summary>
+            <pre><code id="install-command">Checking installer availability…</code></pre>
+            <button id="copy-command" type="button" disabled title="Copy installation commands" aria-label="Copy installation commands">⧉ Copy commands</button>
+            <p id="copy-status" role="status" aria-live="polite"></p>
+          </details>
+        </div>
+      </details>
       <a class="download" data-platform="mac" aria-disabled="true" title="Checking installer availability"><span aria-hidden="true">↓</span> macOS</a>
     </nav>
     <p id="release-status" role="status" aria-live="polite">Checking downloads…</p>
+    <details class="installation-guide">
+      <summary>Linux installation</summary>
+      <section>
+        <h2>Ubuntu / Debian · DEB</h2>
+        <ol>
+          <li>Choose Linux → Ubuntu / Debian · DEB and download the installer.</li>
+          <li>Open the downloaded file with your software installer, if available, and confirm installation.</li>
+          <li>Open WorldTube from your applications menu.</li>
+        </ol>
+        <p>If your software installer does not open DEB files, choose Linux → Terminal. Copy the commands into a terminal to download and install with APT. Installation asks for your password; typing it does not display characters.</p>
+        <p>For a later version, download and install the new DEB. We do not currently provide an APT repository.</p>
+        <a href="https://ubuntu.com/server/docs/how-to/software/package-management/">Ubuntu package installation guide</a>
+      </section>
+      <section>
+        <h2>Portable · AppImage</h2>
+        <ol>
+          <li>Download the AppImage to a folder you want to keep.</li>
+          <li>Right-click the file, open Properties → Permissions, and allow executing it as a program. Labels may differ between file managers.</li>
+          <li>Open the file to run WorldTube. This portable format does not install a DEB package.</li>
+        </ol>
+        <p>If it fails with a FUSE error, use the DEB on Ubuntu or follow the <a href="https://docs.appimage.org/user-guide/troubleshooting/fuse.html">AppImage FUSE guide</a>. Do not run WorldTube as root or disable system security settings to launch it.</p>
+      </section>
+      <p>Current Linux downloads are x64 only, not ARM. Flatpak and Snap packages are not provided.</p>
+    </details>
     <noscript><a class="fallback" href="https://github.com/riberojuanca/worldtube/releases">Download from GitHub Releases</a></noscript>
   </main>
   <footer><a href="https://github.com/riberojuanca/worldtube">GitHub</a><a href="notices.txt">Notices</a></footer>

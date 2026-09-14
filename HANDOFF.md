@@ -2,6 +2,11 @@
 
 ## Version 0.0.4: First-Use Corrections
 
+- Owner chose to keep DEB/AppImage distribution without Flatpak/Flathub.
+  Pages now offers a Linux format chooser, latest-release DEB terminal commands
+  with clipboard/manual-copy fallback, and expandable on-page installation
+  instructions, architecture limits and FUSE troubleshooting. Site edits are
+  prepared locally; deployment requires pushing main. No site build was run.
 - Owner confirmed the published Windows v0.0.3 application works. This does
   not yet validate the installed updater cycle or all export/import scenarios.
 - Fresh profiles now receive a diverse, deduplicated discovery feed from

@@ -37,11 +37,29 @@ main {
   text-decoration: none;
   transition: background-color 160ms, border-color 160ms;
 }
-.download[href]:hover { background: var(--palette-3); border-color: var(--gold); }
-.download[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.download[href]:hover, summary.download:hover { background: var(--palette-3); border-color: var(--gold); }
+[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 .download span { font-size: 22px; line-height: 1; }
-a:focus-visible { outline: 2px solid var(--gold); outline-offset: 5px; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 5px; }
+summary { cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.linux-downloads { position: relative; }
+.linux-options { position: absolute; z-index: 2; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); max-height: 40svh; overflow-y: auto; padding: 8px; border: 1px solid #333; border-radius: 3px; background: #111; }
+.linux-option { display: block; padding: 12px; color: #fff; font-size: 14px; text-decoration: none; border-radius: 3px; }
+.linux-option[href]:hover, summary.linux-option:hover { background: #222; }
+.terminal-install pre { margin: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; color: #ccc; }
+#copy-command { margin: 4px 12px; padding: 8px 12px; border: 1px solid var(--palette-2); border-radius: 3px; background: var(--palette-1); color: #fff; cursor: pointer; }
+#copy-command:disabled { opacity: .5; cursor: not-allowed; }
+#copy-status { margin: 8px 12px; font-size: 12px; color: #aaa; }
 #release-status { margin: 20px 0 0; min-height: 20px; color: #929292; font-size: 12px; text-align: center; }
+.install-note { margin: 0 12px 8px; color: #aaa; font-size: 12px; line-height: 1.5; }
+.installation-guide { width: min(660px, 100%); margin-top: 20px; color: #aaa; font-size: 14px; line-height: 1.6; }
+.installation-guide > summary { width: fit-content; margin: 0 auto; padding: 6px 0; border-bottom: 1px solid #444; }
+.installation-guide section { margin-top: 24px; padding-top: 16px; border-top: 1px solid #333; }
+.installation-guide h2 { margin: 0 0 12px; color: #fff; font-size: 16px; font-weight: 600; }
+.installation-guide ol { padding-left: 24px; }
+.installation-guide li { margin: 6px 0; }
+.installation-guide a { color: #fff; text-underline-offset: 3px; }
 footer { min-height: 48px; display: flex; justify-content: center; align-items: center; gap: 24px; }
 footer a, .fallback { color: #929292; font-size: 12px; text-decoration: none; }
 footer a:hover, .fallback:hover { color: #fff; }
@@ -51,5 +69,7 @@ footer a:hover, .fallback:hover { color: #fff; }
   .logo { margin-bottom: 32px; }
   .downloads { width: 100%; gap: 8px; }
   .download { min-width: 0; flex: 1 1 96px; padding: 12px 10px; font-size: 13px; gap: 6px; }
+  .linux-downloads { flex: 1 1 96px; }
+  .linux-downloads > .download { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .download { transition: none; } }

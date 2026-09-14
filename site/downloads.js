@@ -1,11 +1,40 @@
 const repository = 'riberojuanca/worldtube'
 const status = document.getElementById('release-status')
 const buttons = [...document.querySelectorAll('[data-platform]')]
+const command = document.getElementById('install-command')
+const copyButton = document.getElementById('copy-command')
+const copyStatus = document.getElementById('copy-status')
+
+copyButton.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(command.textContent)
+    copyStatus.textContent = 'Copied'
+  } catch {
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(command)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    copyStatus.textContent = 'Copy unavailable. Select and copy the commands above.'
+  }
+})
+
+const linuxMenu = document.querySelector('.linux-downloads')
+document.addEventListener('pointerdown', (event) => {
+  if (!linuxMenu.contains(event.target)) linuxMenu.open = false
+})
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && linuxMenu.open) {
+    linuxMenu.open = false
+    linuxMenu.querySelector('summary').focus()
+  }
+})
 
 function assetFor(assets, platform) {
   const available = assets.filter((asset) => asset.state === 'uploaded' && asset.size > 0)
   if (platform === 'windows') return available.find((asset) => /\.exe$/i.test(asset.name) && !/arm64|ia32/i.test(asset.name))
-  if (platform === 'linux') return available.find((asset) => /\.AppImage$/i.test(asset.name) && !/arm64|aarch64|ia32/i.test(asset.name))
+  if (platform === 'linux') return available.find((asset) => /\.deb$/i.test(asset.name) && /amd64|x64/i.test(asset.name))
+  if (platform === 'linux-appimage') return available.find((asset) => /\.AppImage$/i.test(asset.name) && !/arm64|aarch64|ia32/i.test(asset.name))
   const matches = available.filter((asset) => /\.dmg$/i.test(asset.name))
   return matches.find((asset) => /universal/i.test(asset.name))
     || matches.find((asset) => /x64/i.test(asset.name))
@@ -35,6 +64,10 @@ async function loadDownloads() {
       button.href = url.href
       button.removeAttribute('aria-disabled')
       button.title = asset.name
+      if (button.dataset.platform === 'linux') {
+        command.textContent = `mkdir -p "$HOME/Downloads" &&\ncd "$HOME/Downloads" &&\nwget -O WorldTube.deb '${url.href.replaceAll("'", "%27")}' &&\nsudo apt install ./WorldTube.deb`
+        copyButton.disabled = false
+      }
       if (button.dataset.platform === 'mac' && /arm64/i.test(asset.name)) {
         button.lastChild.textContent = ' macOS (Apple Silicon)'
       }
@@ -53,6 +86,7 @@ async function loadDownloads() {
     for (const button of buttons) {
       if (!button.hasAttribute('href')) button.title = 'Installer not available yet'
     }
+    if (copyButton.disabled) command.textContent = 'DEB unavailable. Check GitHub Releases.'
   }
 }
 
