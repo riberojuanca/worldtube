@@ -1,22 +1,21 @@
 import { BotGuardClient } from 'bgutils-js/botguard'
-import { buildURL, GOOG_API_KEY, parseLooseJSON } from 'bgutils-js/utils'
+import { buildURL, GOOG_API_KEY } from 'bgutils-js/utils'
 import { WebPoMinter } from 'bgutils-js/webpo'
 import type { WebPoSignalOutput } from 'bgutils-js/shared-types'
+import { extractYouTubePageData } from './pageData'
+import type { BotGuardRequest, BotGuardResponse } from '../botguardNetwork'
 
 /**
  * Runs inside a hidden, offscreen BrowserWindow (see ../poToken.ts) — bundled
  * with esbuild into a single self-contained script and handed to
  * `webContents.executeJavaScript()`, because BotGuard needs a real
- * `window`/`document` and to make same-origin-as-youtube.com requests, which
- * only exists in a renderer, not in the main process.
+ * `window`/`document`, which only exist in a renderer, not in the main process.
  *
- * First pass tried skipping straight to a bare `/att/get` call and got
- * `400 FAILED_PRECONDITION` — YouTube expects an `eacrToken` that only comes
- * from an actual page load, so this scrapes youtube.com's own home page for
- * it first, same technique FreeTube uses (see
- * freetube-audio-lab/src/renderer/helpers/api/local.js#getHTMLPage /
- * #getWatchHTMLWatchPage) — reimplemented here against the public
- * `bgutils-js` API, not copied from that file.
+ * Page configuration is extracted as AST data by pageData.ts. Requests are
+ * performed by Electron's isolated session.fetch bridge; no renderer CORS
+ * headers are rewritten. The attestation lifecycle uses BgUtils's public API.
+ * Historical adaptations and replacement sources are recorded in
+ * docs/LICENSE_REVIEW.md and docs/PROVENANCE_REPLACEMENTS.md.
  *
  * Split into `initBotGuard` (expensive: home page fetch, solving the
  * challenge, minting an integrity token — none of this is video-specific)
@@ -39,15 +38,24 @@ interface InitResult {
 declare global {
   // eslint-disable-next-line no-var
   var __botguardMinter__: InstanceType<typeof WebPoMinter> | undefined
+  interface Window {
+    botguardNetwork: { request(request: BotGuardRequest): Promise<BotGuardResponse> }
+  }
 }
 
 // A bare "Failed to fetch" from the browser tells you nothing about which of
 // the several fetch() calls below actually failed (network, CORS, etc. all
 // look identical) — label each one so a future failure is diagnosable from
 // the error message alone instead of another guessing round.
-async function fetchStep(label: string, input: RequestInfo, init?: RequestInit): Promise<Response> {
+async function fetchStep(label: string, input: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(input, init)
+    const headers = Object.fromEntries(new Headers(init?.headers).entries())
+    const result = await window.botguardNetwork.request({ url: input,
+      method: init?.method === 'POST' ? 'POST' : 'GET', headers,
+      body: typeof init?.body === 'string' ? init.body : undefined })
+    if (result.status < 200 || result.status >= 300) throw new Error(`HTTP ${result.status}: ${result.body.slice(0, 300)}`)
+    return new Response(result.body, { status: result.status, statusText: result.statusText,
+      headers: { 'content-type': result.contentType } })
   } catch (error) {
     throw new Error(`[${label}] fetch threw: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -57,31 +65,24 @@ async function initBotGuard(): Promise<InitResult> {
   const homeResponse = await fetchStep('home page', 'https://www.youtube.com/', {
     headers: { 'Accept-Language': 'en-US' }
   })
-  const homeHtml = await homeResponse.text()
-
-  const ytConfigMatch = homeHtml.match(/ytcfg\.set\(({.+?})\);/s)
-  if (!ytConfigMatch) {
-    throw new Error('Could not find ytcfg in the YouTube home page')
+  const page = extractYouTubePageData(await homeResponse.text())
+  const ytConfig = page.config as {
+    INNERTUBE_CONTEXT?: { client?: { visitorData?: string; clientVersion?: string } }
+    VISITOR_DATA?: string
+    INNERTUBE_CLIENT_VERSION?: string
   }
-  const ytConfig = JSON.parse(ytConfigMatch[1])
-
-  const attestationMatch = homeHtml.match(/window\.ytAtN\(\s*({[\s\S]*?})\s*\)/)
-  if (!attestationMatch) {
-    throw new Error('Could not find BotGuard attestation data in the YouTube home page')
-  }
-  const initialAttestationData = parseLooseJSON(attestationMatch[1]) as {
-    R: { bgChallenge?: unknown }
-    T: string
-  }
+  const initialAttestationData = page.attestation
 
   const context = ytConfig.INNERTUBE_CONTEXT
   const visitorData: string = context?.client?.visitorData ?? ytConfig.VISITOR_DATA ?? ''
-  const clientVersion: string = context?.client?.clientVersion ?? ytConfig.INNERTUBE_CLIENT_VERSION
+  const clientVersion = context?.client?.clientVersion ?? ytConfig.INNERTUBE_CLIENT_VERSION
+  if (!visitorData || !clientVersion || !context) throw new Error('YouTube page configuration is missing client identity')
 
   // BotGuard reads a couple of fields off `window.yt.config_`.
   ;(window as unknown as { yt: { config_: unknown } }).yt = { config_: ytConfig }
 
-  let challengeData = initialAttestationData.R as {
+  let challengeData = (typeof initialAttestationData.R === 'string'
+    ? JSON.parse(initialAttestationData.R) : initialAttestationData.R) as {
     bgChallenge?: {
       interpreterUrl?: { privateDoNotAccessOrElseTrustedResourceUrlWrappedValue?: string }
       program: string
@@ -90,6 +91,7 @@ async function initBotGuard(): Promise<InitResult> {
   }
 
   if (!challengeData?.bgChallenge) {
+    if (typeof initialAttestationData.T !== 'string') throw new Error('YouTube attestation data is missing eacrToken')
     const challengeResponse = await fetchStep(
       'att/get',
       'https://www.youtube.com/youtubei/v1/att/get?prettyPrint=false&alt=json',
@@ -128,7 +130,7 @@ async function initBotGuard(): Promise<InitResult> {
     interpreterUrl = `https:${interpreterUrl}`
   }
 
-  const interpreterJs = await (await fetchStep('interpreter script', interpreterUrl)).text()
+  const interpreterJs = await (await fetchStep('interpreter script', new URL(interpreterUrl, 'https://www.youtube.com/').href)).text()
   if (!interpreterJs) {
     throw new Error('Could not load the BotGuard VM script')
   }
@@ -155,9 +157,13 @@ async function initBotGuard(): Promise<InitResult> {
     body: JSON.stringify([REQUEST_KEY, botGuardResponse])
   })
 
-  const [integrityToken] = await integrityResponse.json()
-  if (typeof integrityToken !== 'string') {
-    throw new Error('Could not obtain an integrity token')
+  const integrityData: unknown = await integrityResponse.json()
+  const integrityToken = Array.isArray(integrityData) ? integrityData[0] : undefined
+  if (typeof integrityToken !== 'string' || integrityToken.length === 0) {
+    const shape = Array.isArray(integrityData)
+      ? integrityData.map((field) => field === null ? 'null' : Array.isArray(field) ? 'array' : typeof field).join(', ')
+      : integrityData === null ? 'null' : typeof integrityData
+    throw new Error(`Could not obtain an integrity token (GenerateIT HTTP ${integrityResponse.status}; response types: ${shape})`)
   }
 
   globalThis.__botguardMinter__ = await WebPoMinter.create({ integrityToken }, webPoSignalOutput)

@@ -25,6 +25,13 @@ import type {
 declare global {
   interface Window {
     api: {
+      getAppPreferences: () => Promise<import('../../shared/locale').AppPreferences>
+      setAppPreferences: (preferences: import('../../shared/locale').AppPreferences) => Promise<void>
+      getUpdateState: () => Promise<import('../../shared/ipc').UpdateState>
+      checkForUpdates: () => Promise<import('../../shared/ipc').UpdateState>
+      downloadUpdate: () => Promise<import('../../shared/ipc').UpdateState>
+      installUpdate: () => Promise<void>
+      onUpdateState: (listener: (state: import('../../shared/ipc').UpdateState) => void) => () => void
       getPlayerAudioPreferences: () => Promise<PlayerAudioPreferences>
       setPlayerAudioPreferences: (audio: PlayerAudioPreferences) => Promise<void>
       getVideoInfo: (videoId: string) => Promise<VideoInfoResponse>

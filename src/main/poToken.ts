@@ -1,6 +1,8 @@
 import { app, BrowserWindow, session } from 'electron'
 import { build } from 'esbuild'
 import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { registerBotGuardNetwork } from './botguardNetwork'
 
 export interface PoTokenInput {
   videoId: string
@@ -23,6 +25,10 @@ let bundledScriptPromise: Promise<string> | null = null
  * otherwise, and re-bundling on every launch is wasted work).
  */
 function getBundledScript(): Promise<string> {
+  if (app.isPackaged) {
+    bundledScriptPromise ??= readFile(join(process.resourcesPath, 'botguard.js'), 'utf8')
+    return bundledScriptPromise
+  }
   bundledScriptPromise ??= build({
     // app.getAppPath() (not __dirname): electron-vite bundles this module
     // itself into out/main/index.js, so __dirname there is out/main/, not
@@ -52,35 +58,8 @@ function getPoTokenSession(): Electron.Session {
   // user's own cookies/storage.
   const s = session.fromPartition('botguard', { cache: false })
 
-  // `baseURLForDataURL` only affects relative-URL resolution, not the CORS
-  // security model — a data: page's origin is still opaque, so fetches to
-  // youtube.com/googleapis.com get blocked by CORS unless we inject the
-  // headers a real page load would have (Referer/Origin/Sec-Fetch-*) and
-  // allow the responses back in. Same idea as FreeTube's session setup for
-  // this exact hidden-window BotGuard flow, reimplemented against Electron's
-  // own webRequest API rather than copied from their file.
-  s.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube.com/*', 'https://*.googleapis.com/*', 'https://www.google.com/*'] }, ({ requestHeaders, url }, callback) => {
-    if (url.startsWith('https://www.youtube.com/youtubei/')) {
-      requestHeaders.Referer = 'https://www.youtube.com/'
-      requestHeaders.Origin = 'https://www.youtube.com'
-      requestHeaders['Sec-Fetch-Site'] = 'same-origin'
-      requestHeaders['Sec-Fetch-Mode'] = 'same-origin'
-    } else {
-      requestHeaders['Sec-Fetch-Dest'] = 'script'
-      requestHeaders['Sec-Fetch-Site'] = 'cross-site'
-    }
-    callback({ requestHeaders })
-  })
-
-  s.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, ({ responseHeaders }, callback) => {
-    callback({
-      responseHeaders: {
-        ...responseHeaders,
-        'Access-Control-Allow-Origin': ['*'],
-        'Access-Control-Allow-Methods': ['GET, HEAD, POST, PUT, DELETE, OPTIONS']
-      }
-    })
-  })
+  s.setPermissionCheckHandler(() => false)
+  s.setPermissionRequestHandler((_contents, _permission, respond) => respond(false))
 
   potokenSession = s
   return s
@@ -121,14 +100,20 @@ async function createBotGuardWindow(): Promise<BotGuardWindow> {
       session: getPoTokenSession(),
       offscreen: true,
       backgroundThrottling: false,
-      sandbox: false
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'botguard-preload.cjs')
     }
   })
   win.webContents.setAudioMuted(true)
+  registerBotGuardNetwork(win)
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event) => event.preventDefault())
 
   try {
-    // baseURLForDataURL makes same-origin requests from this blank page
-    // resolve against youtube.com, which InnerTube requires.
+    // This local blank document only runs the attestation interpreter. Network
+    // requests use the narrowly scoped native bridge, not renderer fetch/CORS.
     await withTimeout(
       win.webContents.loadURL(
         'data:text/html,<!DOCTYPE html><html><head><title></title></head><body></body></html>',
@@ -155,6 +140,7 @@ async function createBotGuardWindow(): Promise<BotGuardWindow> {
     console.log('[poToken] BotGuard challenge solved, window ready for cheap per-video minting')
     return { win, visitorData: initResult.visitorData, createdAt: Date.now() }
   } catch (error) {
+    console.error('[poToken] initialization failed:', error instanceof Error ? error.message : String(error))
     win.destroy()
     throw error
   }

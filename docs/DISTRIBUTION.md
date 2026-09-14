@@ -1,4 +1,10 @@
-# Instalacion y distribucion
+# Distribution Research
+
+Current packaging and updater implementation: [UPDATES.md](UPDATES.md).
+The Spanish research below predates that implementation and is retained as
+history. No installers or update cycle have been validated yet.
+
+## Previous Research
 
 Revision: 2026-09-13. Propuesta, no instaladores implementados.
 
@@ -81,3 +87,9 @@ ocupar el comienzo de la pagina dirigida a usuarios.
 
 Lectura del codigo/configuracion local y fuentes oficiales. Sin instalar
 herramientas de empaquetado, ejecutar builds, crear workflows ni publicar releases.
+# Implementation Update
+
+The earlier research below is retained as history. Packaging configuration,
+GitHub draft-release CI and an in-app updater are now implemented, but have not
+been built or validated. Current setup is in [UPDATES.md](UPDATES.md).
+Project licensing and distribution approval remain pending.

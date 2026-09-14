@@ -45,7 +45,7 @@ function videosFrom(nodes: readonly unknown[], channelId: string, name: string):
         title: (short ? node.overlay_metadata.primary_text?.toString() : node.title.toString()) ?? '',
         channelId,
         channelName: name,
-        thumbnailUrl: (short ? node.thumbnail : node.thumbnails).at(-1)?.url ?? null,
+        thumbnailUrl: (short ? node.thumbnail : node.thumbnails)[0]?.url ?? null,
         durationText: null,
         viewCountText: (short ? node.overlay_metadata.secondary_text?.toString() : node.views?.toString()) ?? null,
         publishedText: null
@@ -53,7 +53,7 @@ function videosFrom(nodes: readonly unknown[], channelId: string, name: string):
     } else if (node instanceof YTNodes.PlaylistVideo) {
       if (!node.is_playable) continue
       videos.push({ videoId: node.id, title: node.title.toString(), channelId: node.author?.id ?? channelId,
-        channelName: node.author?.name ?? name, thumbnailUrl: node.thumbnails.at(-1)?.url ?? null,
+        channelName: node.author?.name ?? name, thumbnailUrl: node.thumbnails[0]?.url ?? null,
         durationText: node.duration?.text ?? null, viewCountText: null, publishedText: node.video_info?.toString() ?? null })
     } else if (node instanceof YTNodes.ChannelVideoPlayer) {
       videos.push({ videoId: node.id, title: node.title.toString(), channelId, channelName: name,
@@ -68,7 +68,7 @@ function playlistsFrom(nodes: readonly unknown[]): ChannelPlaylistItem[] {
   const playlists: ChannelPlaylistItem[] = []
   for (const node of nodes) {
     if (node instanceof YTNodes.GridPlaylist || node instanceof YTNodes.Playlist) {
-      playlists.push({ playlistId: node.id, title: node.title.toString(), thumbnailUrl: node.thumbnails.at(-1)?.url ?? null,
+      playlists.push({ playlistId: node.id, title: node.title.toString(), thumbnailUrl: node.thumbnails[0]?.url ?? null,
         videoCountText: node.video_count?.toString() ?? null })
     } else if (node instanceof YTNodes.LockupView && ['PLAYLIST', 'ALBUM', 'PODCAST'].includes(node.content_type)) {
       playlists.push({ playlistId: node.content_id, title: node.metadata?.title?.toString() ?? '',
@@ -85,7 +85,7 @@ function postsFrom(feed: BrowseFeed, channelId: string, name: string): ChannelPo
     return {
       id: post.id, text: post.content?.toString() ?? '', publishedText: post.published?.toString() ?? null,
       images: attachments.filter((node): node is InstanceType<typeof YTNodes.BackstageImage> => node instanceof YTNodes.BackstageImage)
-        .flatMap((image) => image.image.at(-1)?.url ? [image.image.at(-1)!.url] : []),
+        .flatMap((image) => image.image[0]?.url ? [image.image[0]!.url] : []),
       videos: videosFrom(attachments, channelId, name),
       playlists: playlistsFrom(attachments),
       pollChoices: attachments.filter((node): node is InstanceType<typeof YTNodes.Poll> | InstanceType<typeof YTNodes.Quiz> => node instanceof YTNodes.Poll || node instanceof YTNodes.Quiz)

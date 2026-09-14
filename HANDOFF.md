@@ -1,4 +1,55 @@
-# WorldTube — Estado al 2026-09-13
+# WorldTube: Current Implementation
+
+## Latest Session: Discovery, Library and Playback
+
+- Home now combines a featured video area, related live streams, channel
+  discovery and sections based on recent local viewing. Search includes channels.
+- Recommended channel names use the channel response's `name` field. Missing
+  video author names with a channel ID can be enriched from cached headers.
+- Parsed thumbnails select the largest image, not the last/smallest entry.
+  Video images have resolution fallbacks; Shorts retain portrait-source priority.
+- Channel discovery requests 512px avatars where the supported Google image URL
+  supplies a size marker, falling back to the original on failure. Responsive
+  full-width slots, native horizontal scrolling and overflow arrows replace
+  fixed-width items with unused trailing space.
+- Playlists have covers, search/sort, inline creation and a numbered detail view.
+  Watch links preserve the playlist ID and show its videos above Up next, with
+  the current item marked. This is not an autoplay queue implementation.
+- Top navigation uses brand, back/forward, page refresh and a flexible search
+  field. Refresh remounts the page and reconnects the active Watch player slot.
+- Tabs stay sticky 60px below the header, retaining their normal layout space,
+  horizontal overflow and the existing sidebar placement.
+- SABR adapters are registered per playback session, with cancellation guards
+  for rapid tab/video changes. Ordinary manual playback and tab switching were
+  reported working; broader automated coverage remains pending.
+- English/Spanish preferences, packaging/update setup and source replacements
+  are included in this session. Release approval stays disabled.
+- Latest read-only provenance comparison: zero exact runs at 24 tokens, zero
+  shared regex literals, fourteen normalized syntax/API candidates and zero
+  byte-identical assets in its documented scope. This is not legal clearance.
+- No production build, typecheck or automated runtime tests were run. The dev
+  app was restarted; subsequent renderer changes use HMR. No release or push.
+
+See [Home](docs/HOME_DISCOVERY.md), [Playlists](docs/PLAYLISTS.md) and
+[Provenance](docs/PROVENANCE_REPLACEMENTS.md). New code must use upstream APIs
+and documented requirements, not FreeTube application code as a template.
+
+See [Updates](docs/UPDATES.md), [Languages](docs/I18N.md) and
+[Source Review](docs/LICENSE_REVIEW.md) for the latest implementation. The final
+section of this handoff records the updates/language work. Earlier Spanish
+entries below are historical and can describe superseded behavior.
+
+## Provenance Work: 2026-09-13
+
+The four flagged metadata/page-data/header/storyboard implementations were
+replaced; see [sources and limits](docs/PROVENANCE_REPLACEMENTS.md). Use official
+upstream documentation/library APIs for new implementation, not FreeTube
+application source as a coding template. Earlier blanket independence claims
+and the instruction below to consult FreeTube first are superseded, not proof
+of provenance clearance. Keep release approval disabled. No build/typecheck
+or runtime suite was run; main changes need a development restart.
+
+## Previous State: 2026-09-13
 
 ## Actualización actual: pestañas, atajos, canales y biblioteca
 
@@ -506,3 +557,17 @@ El trabajo grande (SABR reproduciendo) ya está, hay navegación básica y Watch
 1. Capítulos.
 2. Comentarios, playlist/sidebar avanzada y live chat/upcoming.
 3. Probar formalmente seek, cambio de calidad manual y un video sin SABR.
+# Latest Implementation: Updates and Languages
+
+- Git origin is now `git@github.com:riberojuanca/worldtube.git`; nothing was pushed.
+- English is the default UI language; Spanish is selectable in Account > Application.
+- Global preferences live in `settings.appPreferences` and are exported/imported.
+- Packaging and explicit-consent updates use electron-builder/electron-updater.
+- GitHub CI prepares draft releases manually or on version tags; licensing
+  approval gates execution. No workflow, installer or complete updater cycle was run.
+- Preliminary provenance review found identical FreeTube Lab metadata regexes
+  and equivalent predicates. No project LICENSE was chosen; prior blanket
+  claims of independent source must not be treated as established clearance.
+- See `docs/UPDATES.md`, `docs/I18N.md` and `docs/LICENSE_REVIEW.md`.
+- No production builds, typechecks or automated tests were run. Earlier Spanish handoff
+  earlier entries are retained as history and may describe superseded behavior.

@@ -1,3 +1,4 @@
+import { t, useLocale } from '../i18n/LocaleContext'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type {
   CreateLocalUserRequest,
@@ -33,6 +34,7 @@ function isMissingPreload(error: unknown): boolean {
 }
 
 function AuthShell({ children }: { children: ReactNode }) {
+  useLocale()
   return (
     <div className="grid min-h-screen place-items-center bg-neutral-950 p-4 text-neutral-100">
       <div className="w-full max-w-sm border border-neutral-800 bg-neutral-900 p-4 shadow-2xl shadow-black/30">{children}</div>
@@ -41,6 +43,7 @@ function AuthShell({ children }: { children: ReactNode }) {
 }
 
 function SetupLocalUser({ onCreate }: { onCreate: (request: CreateLocalUserRequest) => Promise<void> }) {
+  useLocale()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -56,26 +59,25 @@ function SetupLocalUser({ onCreate }: { onCreate: (request: CreateLocalUserReque
 
   return (
     <AuthShell>
-      <h1 className="text-lg font-semibold">Crear usuario local</h1>
-      <p className="mt-1 text-sm text-neutral-400">Tus datos quedan en esta computadora y se pueden exportar completos.</p>
+      <h1 className="text-lg font-semibold">{t("Crear usuario local")}</h1>
+      <p className="mt-1 text-sm text-neutral-400">{t("Tus datos quedan en esta computadora y se pueden exportar completos.")}</p>
       <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Nombre"
+          placeholder={t("Nombre")}
           className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
         />
         <input
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="Contraseña opcional"
+          placeholder={t("Contraseña opcional")}
           type="password"
           className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-400">{t(error)}</p>}
         <button type="submit" className="wt-action-important h-10 rounded px-3 text-sm font-medium">
-          Empezar
-        </button>
+          {t("Empezar")}</button>
       </form>
     </AuthShell>
   )
@@ -88,6 +90,7 @@ function LoginLocalUser({
   users: LocalUser[]
   onLogin: (request: LoginLocalUserRequest) => Promise<void>
 }) {
+  useLocale()
   const [userId, setUserId] = useState(users[0]?.id ?? '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -105,7 +108,7 @@ function LoginLocalUser({
 
   return (
     <AuthShell>
-      <h1 className="text-lg font-semibold">Iniciar sesión local</h1>
+      <h1 className="text-lg font-semibold">{t("Iniciar sesión local")}</h1>
       <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
         <select
           value={selectedUser?.id ?? ''}
@@ -126,21 +129,21 @@ function LoginLocalUser({
           <input
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Contraseña"
+            placeholder={t("Contraseña")}
             type="password"
             className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
           />
         )}
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-400">{t(error)}</p>}
         <button type="submit" className="wt-action-important h-10 rounded px-3 text-sm font-medium">
-          Entrar
-        </button>
+          {t("Entrar")}</button>
       </form>
     </AuthShell>
   )
 }
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
+  useLocale()
   const [state, setState] = useState<LocalSessionState | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
 
@@ -155,7 +158,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setBootError(
             isMissingPreload(error)
-              ? 'Reiniciá WorldTube para cargar la sesión local nueva.'
+              ? t("Reiniciá WorldTube para cargar la sesión local nueva.")
               : error instanceof Error
                 ? error.message
                 : String(error)
@@ -249,14 +252,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   if (bootError) {
     return (
       <AuthShell>
-        <h1 className="text-lg font-semibold">Sesión local</h1>
-        <p className="mt-2 text-sm text-red-400">{bootError}</p>
+        <h1 className="text-lg font-semibold">{t("Sesión local")}</h1>
+        <p className="mt-2 text-sm text-red-400">{t(bootError)}</p>
       </AuthShell>
     )
   }
 
   if (!state) {
-    return <div className="grid min-h-screen place-items-center bg-neutral-950 text-sm text-neutral-400">Cargando sesión…</div>
+    return <div className="grid min-h-screen place-items-center bg-neutral-950 text-sm text-neutral-400">{t("Cargando sesión…")}</div>
   }
 
   if (state.setupRequired) {

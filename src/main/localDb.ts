@@ -403,6 +403,27 @@ export async function getPlayerAudioPreferences(): Promise<import('../shared/ipc
     muted: audio?.muted === true }
 }
 
+let appLanguage: import('../shared/locale').AppLanguage = 'en'
+export const getAppLanguage = () => appLanguage
+
+export async function getAppPreferences(): Promise<import('../shared/locale').AppPreferences> {
+  const db = await loadDb()
+  const preferences = db.settings.appPreferences as Partial<import('../shared/locale').AppPreferences> | undefined
+  appLanguage = preferences?.language === 'es' ? 'es' : 'en'
+  return { language: appLanguage,
+    checkForUpdatesOnStartup: preferences?.checkForUpdatesOnStartup !== false }
+}
+
+export async function setAppPreferences(preferences: import('../shared/locale').AppPreferences): Promise<void> {
+  if (!preferences || !['en', 'es'].includes(preferences.language) || typeof preferences.checkForUpdatesOnStartup !== 'boolean') {
+    throw new Error('Invalid application preferences')
+  }
+  const db = await loadDb()
+  db.settings.appPreferences = { language: preferences.language, checkForUpdatesOnStartup: preferences.checkForUpdatesOnStartup }
+  await persistDb(db)
+  appLanguage = preferences.language
+}
+
 export async function setPlayerAudioPreferences(audio: import('../shared/ipc').PlayerAudioPreferences): Promise<void> {
   if (!Number.isFinite(audio.volume) || typeof audio.muted !== 'boolean') throw new Error('Volumen invalido')
   const db = await loadDb()

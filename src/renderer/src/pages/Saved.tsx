@@ -1,3 +1,4 @@
+import { t, useLocale, locale } from '../i18n/LocaleContext'
 import { useEffect, useState } from 'react'
 import { VideoCard } from '../components/VideoCard'
 import { useProfiles } from '../profiles/ProfileContext'
@@ -5,11 +6,12 @@ import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import type { SavedVideo } from '../../../shared/ipc'
 
 function formatSavedAt(timestampMs: number): string {
-  if (!timestampMs) return 'Guardado'
-  return `Guardado ${new Date(timestampMs).toLocaleDateString()}`
+  if (!timestampMs) return t("Guardado")
+  return t('Guardado {date}', { date: new Date(timestampMs).toLocaleDateString(locale()) })
 }
 
 export function Saved() {
+  useLocale()
   const [videos, setVideos] = useState<SavedVideo[] | null>(null)
   const { activeProfileId } = useProfiles()
 
@@ -31,13 +33,13 @@ export function Saved() {
     }
   }, [activeProfileId])
 
-  if (videos === null) return <p className="text-sm text-neutral-400">Cargando…</p>
+  if (videos === null) return <p className="text-sm text-neutral-400">{t("Cargando…")}</p>
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">Guardados</h1>
+      <h1 className="mb-4 text-xl font-semibold">{t("Guardados")}</h1>
       {videos.length === 0 ? (
-        <p className="text-sm text-neutral-400">No hay videos guardados.</p>
+        <p className="text-sm text-neutral-400">{t("No hay videos guardados.")}</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {videos.map((video) => (

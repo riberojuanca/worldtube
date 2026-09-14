@@ -1,0 +1,42 @@
+appId: com.riberojuanca.worldtube
+productName: WorldTube
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - node_modules/@esbuild/**/*
+extraResources:
+  - from: resources/botguard-preload.cjs
+    to: botguard-preload.cjs
+  - from: resources/icon.png
+    to: icon.png
+  - from: build/botguard.js
+    to: botguard.js
+publish:
+  provider: github
+  owner: riberojuanca
+  repo: worldtube
+  releaseType: draft
+linux:
+  syncDesktopName: true
+  icon: resources/icons
+  maintainer: riberojuanca
+  category: AudioVideo
+  target:
+    - AppImage
+    - deb
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+mac:
+  category: public.app-category.entertainment
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true

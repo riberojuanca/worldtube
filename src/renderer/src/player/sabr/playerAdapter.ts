@@ -146,12 +146,41 @@ export class ShakaSabrPlayerAdapter implements SabrPlayerAdapter {
     segment: RequestSegment,
     abortController: AbortController
   ): Promise<PlayerHttpResponse> {
+    try {
+      return await this.runRequestCycleImpl(url, extraHeaders, segment, abortController)
+    } catch (error) {
+      if (this.disposed || abortController.signal.aborted) {
+        throw new ShakaError(ShakaError.Severity.RECOVERABLE, ShakaError.Category.NETWORK, ShakaError.Code.OPERATION_ABORTED, url)
+      }
+      throw error
+    }
+  }
+
+  private assertRequestActive(url: string, abortController: AbortController): void {
+    if (this.disposed || abortController.signal.aborted) {
+      throw new ShakaError(ShakaError.Severity.RECOVERABLE, ShakaError.Category.NETWORK, ShakaError.Code.OPERATION_ABORTED, url)
+    }
+  }
+
+  private async runRequestCycleImpl(
+    url: string,
+    extraHeaders: Record<string, string>,
+    segment: RequestSegment,
+    abortController: AbortController
+  ): Promise<PlayerHttpResponse> {
+    this.assertRequestActive(url, abortController)
     if (this.disposed || !this.requestInterceptor || !this.responseInterceptor || !this.requestMetadataManager) {
       throw new ShakaError(ShakaError.Severity.CRITICAL, ShakaError.Category.NETWORK, ShakaError.Code.OPERATION_ABORTED, url)
     }
 
+    const requestInterceptor = this.requestInterceptor
+    const responseInterceptor = this.responseInterceptor
+    const metadataManager = this.requestMetadataManager
+    const cacheManager = this.cacheManager
+
     const baseRequest: PlayerHttpRequest = { url, method: 'GET', headers: { ...extraHeaders }, segment }
-    const finalRequest = (await this.requestInterceptor(baseRequest)) ?? baseRequest
+    const finalRequest = (await requestInterceptor(baseRequest)) ?? baseRequest
+    this.assertRequestActive(url, abortController)
 
     let fetchResponse: Response
     try {
@@ -168,25 +197,32 @@ export class ShakaSabrPlayerAdapter implements SabrPlayerAdapter {
       throw new ShakaError(ShakaError.Severity.RECOVERABLE, ShakaError.Category.NETWORK, ShakaError.Code.HTTP_ERROR, url, error)
     }
 
+    this.assertRequestActive(url, abortController)
     if (!fetchResponse.ok) {
       const severity = fetchResponse.status === 401 || fetchResponse.status === 403 ? ShakaError.Severity.CRITICAL : ShakaError.Severity.RECOVERABLE
       throw new ShakaError(severity, ShakaError.Category.NETWORK, ShakaError.Code.BAD_HTTP_STATUS, url, fetchResponse.status, '', {}, undefined, url)
     }
 
-    const metadata = this.requestMetadataManager.getRequestMetadata(finalRequest.url)
+    const metadata = metadataManager.getRequestMetadata(finalRequest.url)
     if (!metadata) {
       throw new ShakaError(ShakaError.Severity.CRITICAL, ShakaError.Category.NETWORK, ShakaError.Code.HTTP_ERROR, url, new Error('SABR request metadata missing (request interceptor did not run?)'))
     }
 
-    const processor = new SabrUmpProcessor(metadata, this.cacheManager ?? undefined)
+    const processor = new SabrUmpProcessor(metadata, cacheManager ?? undefined)
     const reader = fetchResponse.body?.getReader()
 
     let result: UmpProcessingResult | undefined
     if (reader) {
-      let chunk = await reader.read()
-      while (!chunk.done && !result) {
-        result = await processor.processChunk(chunk.value)
-        if (!result) chunk = await reader.read()
+      try {
+        let chunk = await reader.read()
+        while (!chunk.done && !result) {
+          this.assertRequestActive(url, abortController)
+          result = await processor.processChunk(chunk.value)
+          if (!result) chunk = await reader.read()
+        }
+      } finally {
+        await reader.cancel().catch(() => {})
+        reader.releaseLock()
       }
     }
 
@@ -198,15 +234,21 @@ export class ShakaSabrPlayerAdapter implements SabrPlayerAdapter {
       makeRequest: (followupUrl, followupHeaders) => this.runRequestCycle(followupUrl, followupHeaders, segment, abortController)
     }
 
-    return (await this.responseInterceptor(response)) ?? response
+    this.assertRequestActive(url, abortController)
+    const finalResponse = (await responseInterceptor(response)) ?? response
+    this.assertRequestActive(url, abortController)
+    return finalResponse
   }
 }
 
 let schemeRegistered = false
-let activeAdapter: ShakaSabrPlayerAdapter | null = null
+const sessionAdapters = new Map<string, ShakaSabrPlayerAdapter>()
 
-export function setActiveSabrPlayerAdapter(adapter: ShakaSabrPlayerAdapter | null): void {
-  activeAdapter = adapter
+export function registerSabrPlayerAdapter(sessionId: string, adapter: ShakaSabrPlayerAdapter): () => void {
+  sessionAdapters.set(sessionId, adapter)
+  return () => {
+    if (sessionAdapters.get(sessionId) === adapter) sessionAdapters.delete(sessionId)
+  }
 }
 
 /** Idempotent — safe to call on every SABR video load. */
@@ -214,12 +256,14 @@ export function ensureSabrSchemeRegistered(): void {
   if (schemeRegistered) return
 
   shaka.net.NetworkingEngine.registerScheme('sabr', (uri, request) => {
-    if (!activeAdapter) {
+    const { sessionId } = parseSabrUri(uri)
+    const adapter = sessionAdapters.get(sessionId)
+    if (!adapter) {
       return AbortableOperation.failed(
-        new ShakaError(ShakaError.Severity.CRITICAL, ShakaError.Category.NETWORK, ShakaError.Code.HTTP_ERROR, uri, new Error('No active SABR player adapter'))
+        new ShakaError(ShakaError.Severity.RECOVERABLE, ShakaError.Category.NETWORK, ShakaError.Code.OPERATION_ABORTED, uri)
       )
     }
-    return activeAdapter.handleShakaRequest(uri, request)
+    return adapter.handleShakaRequest(uri, request)
   })
 
   schemeRegistered = true

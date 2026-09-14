@@ -1,11 +1,13 @@
+import { t, useLocale, locale } from '../i18n/LocaleContext'
 import { useState, type FormEvent } from 'react'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import { useProfiles } from '../profiles/ProfileContext'
+import { ApplicationSettings } from '../components/ApplicationSettings'
 import type { LocalUser, UserProfile } from '../../../shared/ipc'
 
 function formatDate(timestamp: number): string {
-  if (!timestamp) return 'Sin fecha'
-  return new Date(timestamp).toLocaleString()
+  if (!timestamp) return t("Sin fecha")
+  return new Date(timestamp).toLocaleString(locale())
 }
 
 function profileInitial(profile: UserProfile): string {
@@ -13,6 +15,7 @@ function profileInitial(profile: UserProfile): string {
 }
 
 function ProfileAvatar({ profile, size = 'h-9 w-9' }: { profile: UserProfile; size?: string }) {
+  useLocale()
   if (profile.avatarDataUrl) {
     return <img src={profile.avatarDataUrl} alt="" className={`${size} shrink-0 rounded object-cover`} />
   }
@@ -32,6 +35,7 @@ function userInitial(user: LocalUser): string {
 }
 
 export function Account() {
+  useLocale()
   const {
     users,
     activeUser,
@@ -78,7 +82,7 @@ export function Account() {
     try {
       await createProfile({ name: profileName })
       setProfileName('')
-      setMessage('Perfil creado')
+      setMessage(t("Perfil creado"))
       setError(null)
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : String(createError))
@@ -91,7 +95,7 @@ export function Account() {
       await createLocalUser({ name: userName, password: userPassword.trim() || undefined })
       setUserName('')
       setUserPassword('')
-      setMessage('Usuario creado')
+      setMessage(t("Usuario creado"))
       setError(null)
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : String(createError))
@@ -108,7 +112,7 @@ export function Account() {
       await removeProfile(profileId)
       window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
       setConfirmProfileId(null)
-      setMessage('Perfil eliminado')
+      setMessage(t("Perfil eliminado"))
       setError(null)
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : String(removeError))
@@ -125,7 +129,7 @@ export function Account() {
       await deleteLocalUser({ userId })
       window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
       setConfirmUserId(null)
-      setMessage('Usuario eliminado')
+      setMessage(t("Usuario eliminado"))
       setError(null)
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : String(deleteError))
@@ -134,14 +138,15 @@ export function Account() {
 
   async function handleExport() {
     const filePath = await exportData()
-    setMessage(filePath ? `Exportado: ${filePath}` : 'Exportación cancelada')
+    setMessage(filePath ? t('Exportado: {path}', { path: filePath }) : t("Exportación cancelada"))
     setError(null)
   }
 
   async function handleImport() {
     await importData()
+    window.dispatchEvent(new Event('worldtube:preferences-changed'))
     window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
-    setMessage('Datos importados')
+    setMessage(t("Datos importados"))
     setError(null)
   }
 
@@ -149,22 +154,23 @@ export function Account() {
     <div className="mx-auto grid max-w-4xl gap-6">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-800 pb-4">
         <div>
-          <h1 className="text-xl font-semibold">Cuenta</h1>
-          <p className="mt-1 text-sm text-neutral-400">Datos locales de {activeUser.name}</p>
+          <h1 className="text-xl font-semibold">{t("Cuenta")}</h1>
+          <p className="mt-1 text-sm text-neutral-400">{t("Datos locales de")} {activeUser.name}</p>
         </div>
         <button type="button" onClick={logoutLocalUser} className="rounded px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900">
-          Cerrar sesión
-        </button>
+          {t("Cerrar sesión")}</button>
       </header>
 
       {(message || error) && (
         <div className={['border px-3 py-2 text-sm', error ? 'border-red-900 bg-red-950/30 text-red-300' : 'border-neutral-800 bg-neutral-900 text-neutral-300'].join(' ')}>
-          {error ?? message}
+          {t(error ?? message ?? '')}
         </div>
       )}
 
+      <ApplicationSettings />
+
       <section className="grid gap-3">
-        <h2 className="border-b border-neutral-800 pb-2 text-base font-semibold">Usuarios locales</h2>
+        <h2 className="border-b border-neutral-800 pb-2 text-base font-semibold">{t("Usuarios locales")}</h2>
         <div className="divide-y divide-neutral-800 border-y border-neutral-800">
           {users.map((user) => (
             <div key={user.id} className="grid gap-3 py-3 md:grid-cols-[1fr_auto] md:items-center">
@@ -173,10 +179,10 @@ export function Account() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">
                     {user.name}
-                    {user.id === activeUserId && <span className="ml-2 text-xs text-neutral-500">activo</span>}
+                    {user.id === activeUserId && <span className="ml-2 text-xs text-neutral-500">{t("activo")}</span>}
                   </p>
                   <p className="truncate text-xs text-neutral-500">
-                    {user.hasPassword ? 'Con contraseña' : 'Sin contraseña'} · creado {formatDate(user.createdAt)}
+                    {user.hasPassword ? t("Con contraseña") : t("Sin contraseña")} {t("· creado")} {formatDate(user.createdAt)}
                   </p>
                 </div>
               </div>
@@ -185,7 +191,7 @@ export function Account() {
                 onClick={() => handleDeleteUser(user.id)}
                 className="rounded px-3 py-2 text-sm text-red-300 hover:bg-red-950/40"
               >
-                {confirmUserId === user.id ? 'Confirmar eliminación' : 'Eliminar usuario'}
+                {confirmUserId === user.id ? t("Confirmar eliminación") : t("Eliminar usuario")}
               </button>
             </div>
           ))}
@@ -194,24 +200,23 @@ export function Account() {
           <input
             value={userName}
             onChange={(event) => setUserName(event.target.value)}
-            placeholder="Nombre de usuario"
+            placeholder={t("Nombre de usuario")}
             className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
           />
           <input
             value={userPassword}
             onChange={(event) => setUserPassword(event.target.value)}
-            placeholder="Contraseña opcional"
+            placeholder={t("Contraseña opcional")}
             type="password"
             className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
           />
           <button type="submit" className="rounded bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-700">
-            Crear usuario
-          </button>
+            {t("Crear usuario")}</button>
         </form>
       </section>
 
       <section className="grid gap-3">
-        <h2 className="border-b border-neutral-800 pb-2 text-base font-semibold">Perfiles de {activeUser.name}</h2>
+        <h2 className="border-b border-neutral-800 pb-2 text-base font-semibold">{t("Perfiles de")} {activeUser.name}</h2>
         <div className="divide-y divide-neutral-800 border-y border-neutral-800">
           {profiles.map((profile) => (
             <div key={profile.id} className="grid gap-3 py-3 md:grid-cols-[1fr_auto_auto] md:items-center">
@@ -220,9 +225,9 @@ export function Account() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">
                     {profile.name}
-                    {profile.id === activeProfileId && <span className="ml-2 text-xs text-neutral-500">activo</span>}
+                    {profile.id === activeProfileId && <span className="ml-2 text-xs text-neutral-500">{t("activo")}</span>}
                   </p>
-                  <p className="truncate text-xs text-neutral-500">creado {formatDate(profile.createdAt)}</p>
+                  <p className="truncate text-xs text-neutral-500">{t("creado")} {formatDate(profile.createdAt)}</p>
                 </div>
               </div>
               <button
@@ -231,14 +236,13 @@ export function Account() {
                 disabled={profile.id === activeProfileId}
                 className="rounded px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-800 disabled:cursor-default disabled:text-neutral-600 disabled:hover:bg-transparent"
               >
-                Activar
-              </button>
+                {t("Activar")}</button>
               <button
                 type="button"
                 onClick={() => handleRemoveProfile(profile.id)}
                 className="rounded px-3 py-2 text-sm text-red-300 hover:bg-red-950/40"
               >
-                {confirmProfileId === profile.id ? 'Confirmar eliminación' : 'Eliminar perfil'}
+                {confirmProfileId === profile.id ? t("Confirmar eliminación") : t("Eliminar perfil")}
               </button>
             </div>
           ))}
@@ -247,65 +251,59 @@ export function Account() {
           <input
             value={profileName}
             onChange={(event) => setProfileName(event.target.value)}
-            placeholder="Nombre de perfil"
+            placeholder={t("Nombre de perfil")}
             className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
           />
           <button type="submit" className="rounded bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-700">
-            Crear perfil
-          </button>
+            {t("Crear perfil")}</button>
         </form>
       </section>
 
       <details className="border-t border-neutral-800 pt-3">
         <summary className="cursor-pointer select-none text-sm font-medium text-neutral-300 hover:text-neutral-100">
-          Paquete local y exportación
-        </summary>
+          {t("Paquete local y exportación")}</summary>
         <div className="mt-4 grid gap-4 text-sm">
           <p className="break-words text-neutral-400">{safeDataPath}</p>
           <dl className="grid gap-x-6 md:grid-cols-2">
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Usuarios</dt>
+              <dt className="text-neutral-500">{t("Usuarios")}</dt>
               <dd className="font-medium">{safeStats.users}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Perfiles</dt>
+              <dt className="text-neutral-500">{t("Perfiles")}</dt>
               <dd className="font-medium">{safeStats.profiles}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Historial</dt>
+              <dt className="text-neutral-500">{t("Historial")}</dt>
               <dd className="font-medium">{safeStats.historyEntries}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Suscripciones</dt>
+              <dt className="text-neutral-500">{t("Suscripciones")}</dt>
               <dd className="font-medium">{safeStats.subscriptions}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Playlists</dt>
+              <dt className="text-neutral-500">{t("Playlists")}</dt>
               <dd className="font-medium">{safeStats.savedPlaylists}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Videos guardados</dt>
+              <dt className="text-neutral-500">{t("Videos guardados")}</dt>
               <dd className="font-medium">{safeStats.savedVideos}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-neutral-800 py-2">
-              <dt className="text-neutral-500">Versión DB</dt>
+              <dt className="text-neutral-500">{t("Versión DB")}</dt>
               <dd className="font-medium">{safeStorageVersion}</dd>
             </div>
           </dl>
           <div className="grid gap-1 text-neutral-400">
             <p>
-              Se exporta: usuarios locales, hashes de contraseña, sesión activa, perfiles con nombre/color/foto, historial,
-              suscripciones, playlists guardadas, videos guardados y settings.
-            </p>
-            <p>No se exporta: cachés temporales de video, procesos de reproducción, tokens efímeros de YouTube ni archivos de build.</p>
+              {t("Se exporta: usuarios locales, hashes de contraseña, sesión activa, perfiles con nombre/color/foto, historial, suscripciones, playlists guardadas, videos guardados y settings.")}</p>
+            <p>{t("No se exporta: cachés temporales de video, procesos de reproducción, tokens efímeros de YouTube ni archivos de build.")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={handleExport} className="wt-action-important rounded px-3 py-2 text-sm font-medium">
-              Exportar todo
-            </button>
+              {t("Exportar todo")}</button>
             <button type="button" onClick={handleImport} className="rounded bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-700">
-              Importar paquete
-            </button>
+              {t("Importar paquete")}</button>
           </div>
         </div>
       </details>

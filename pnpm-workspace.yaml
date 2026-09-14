@@ -1,3 +1,5 @@
 # https://pnpm.io/next/settings#allowbuilds
 allowBuilds:
+  electron: true # Downloads the official Electron executable; does not build WorldTube.
+  electron-winstaller: false # NSIS is used; the Squirrel installer is not needed.
   esbuild: true # Vite's bundled esbuild just downloads its own native binary on postinstall

@@ -1,0 +1,119 @@
+name: Prepare release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require distribution approval
+        env:
+          APPROVED: ${{ vars.DISTRIBUTION_APPROVED }}
+        run: |
+          if [ "$APPROVED" != "true" ] || [ ! -f LICENSE ]; then
+            echo "Complete the source/license review, choose LICENSE, then set DISTRIBUTION_APPROVED=true."
+            exit 1
+          fi
+      - name: Resolve release version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          if [ "$REF_TYPE" = "tag" ] && [ "$REF_NAME" != "$TAG" ]; then
+            echo "The tag must match package.json: $TAG"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Prepare draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft)
+            if [ "$DRAFT" != "true" ]; then
+              echo "Do not overwrite published versions. Increment package.json."
+              exit 1
+            fi
+          else
+            gh release create "$TAG" --draft --title "WorldTube $TAG" --generate-notes --target "$GITHUB_SHA"
+          fi
+
+  package:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global corepack
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Package and upload to draft
+        run: pnpm release --x64
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worldtube-${{ matrix.os }}
+          path: release/*
+          if-no-files-found: error
+
+  mac:
+    needs: prepare
+    if: vars.ENABLE_MAC_RELEASE == 'true'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global corepack
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Require signing credentials
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          test -n "$CSC_LINK" && test -n "$CSC_KEY_PASSWORD" && test -n "$APPLE_ID" && test -n "$APPLE_APP_SPECIFIC_PASSWORD" && test -n "$APPLE_TEAM_ID"
+      - name: Package signed macOS release
+        run: pnpm release --arm64
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

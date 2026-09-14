@@ -1,3 +1,4 @@
+import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import { useProfiles } from '../profiles/ProfileContext'
@@ -13,6 +14,7 @@ interface VideoSaveButtonProps {
 }
 
 function SaveIcon({ className = 'h-4 w-4', filled = false }: { className?: string; filled?: boolean }) {
+  useLocale()
   return (
     <svg
       aria-hidden="true"
@@ -30,6 +32,7 @@ function SaveIcon({ className = 'h-4 w-4', filled = false }: { className?: strin
 }
 
 function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  useLocale()
   return (
     <svg
       aria-hidden="true"
@@ -54,6 +57,7 @@ function optionClass(isActive: boolean): string {
 }
 
 export function VideoSaveButton({ video, className = '', buttonClassName, label, menuPosition = 'below', mode = 'combined' }: VideoSaveButtonProps) {
+  useLocale()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [playlists, setPlaylists] = useState<SavedPlaylist[]>([])
@@ -81,7 +85,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
         setIsLoaded(true)
       })
       .catch(() => {
-        if (!cancelled) setStatus('No se pudo cargar')
+        if (!cancelled) setStatus(t("No se pudo cargar"))
       })
     void load()
     window.addEventListener(PROFILE_DATA_CHANGED_EVENT, load)
@@ -98,7 +102,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
     const load = () => window.api.listSavedPlaylists().then((items) => {
       if (!cancelled) setPlaylists(items)
     }).catch(() => {
-      if (!cancelled) setStatus('No se pudo cargar')
+      if (!cancelled) setStatus(t("No se pudo cargar"))
     })
     void load()
     window.addEventListener(PROFILE_DATA_CHANGED_EVENT, load)
@@ -132,11 +136,11 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
     try {
       await window.api.saveVideo({ ...video, playlistId })
       await refreshSavedState()
-      setStatus('Guardado')
+      setStatus(t("Guardado"))
       window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
       window.setTimeout(() => setStatus(null), 1400)
     } catch {
-      setStatus('No se pudo guardar')
+      setStatus(t("No se pudo guardar"))
     }
   }
 
@@ -144,11 +148,11 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
     try {
       await window.api.removeSavedVideo(video.videoId, playlistId)
       await refreshSavedState()
-      setStatus('Quitado')
+      setStatus(t("Quitado"))
       window.dispatchEvent(new CustomEvent(PROFILE_DATA_CHANGED_EVENT))
       window.setTimeout(() => setStatus(null), 1400)
     } catch {
-      setStatus('No se pudo quitar')
+      setStatus(t("No se pudo quitar"))
     }
   }
 
@@ -161,7 +165,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
       setNewPlaylistName('')
       await saveTo(playlist.id)
     } catch {
-      setStatus('No se pudo crear')
+      setStatus(t("No se pudo crear"))
     }
   }
 
@@ -178,8 +182,8 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
     } finally { setIsBusy(false) }
   }
 
-  const actionLabel = mode === 'playlists' ? isInPlaylist ? 'En playlists: gestionar playlists' : 'Agregar a playlist'
-    : mode === 'saved' ? savedPlaylistIds.has(null) ? 'Quitar de Guardados' : 'Guardar en Guardados' : 'Guardar'
+  const actionLabel = mode === 'playlists' ? isInPlaylist ? t("En playlists: gestionar playlists") : t("Agregar a playlist")
+    : mode === 'saved' ? savedPlaylistIds.has(null) ? t("Quitar de Guardados") : t("Guardar en Guardados") : t("Guardar")
 
   return (
     <div ref={rootRef} className={className} onClick={stopClick}>
@@ -196,7 +200,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
         aria-pressed={mode === 'saved' ? savedPlaylistIds.has(null) : undefined}
         aria-haspopup={mode !== 'saved' ? 'dialog' : undefined}
         aria-expanded={mode !== 'saved' ? isOpen : undefined}
-        title={canManageSavedVideos ? actionLabel : 'Reinicia la app para activar Guardar'}
+        title={canManageSavedVideos ? actionLabel : t("Reinicia la app para activar Guardar")}
       >
         {mode === 'playlists' ? isInPlaylist ? <CheckIcon /> : <span aria-hidden="true" className="text-xl leading-none">+</span> : <SaveIcon filled={mode === 'saved' && savedPlaylistIds.has(null)} />}
         {label && <span>{label}</span>}
@@ -204,13 +208,13 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
 
       {mode === 'saved' && status && <span role="status" className="sr-only">{status}</span>}
       {isOpen && mode !== 'saved' && (
-        <div role="dialog" aria-label="Guardar en playlists" className={`absolute right-0 z-30 w-64 rounded border border-neutral-800 bg-neutral-950 p-2 shadow-2xl shadow-black/40 ${menuPosition === 'above' ? 'bottom-10' : 'top-9'}`}>
+        <div role="dialog" aria-label={t("Guardar en playlists")} className={`absolute right-0 z-30 w-64 rounded border border-neutral-800 bg-neutral-950 p-2 shadow-2xl shadow-black/40 ${menuPosition === 'above' ? 'bottom-10' : 'top-9'}`}>
           {mode === 'combined' && <><button
             type="button"
             className={optionClass(savedPlaylistIds.has(null))}
             onClick={() => (savedPlaylistIds.has(null) ? removeFrom(null) : saveTo(null))}
           >
-            <span className="truncate">Guardados</span>
+            <span className="truncate">{t("Guardados")}</span>
             {savedPlaylistIds.has(null) && <CheckIcon className="wt-accent-text h-4 w-4 shrink-0" />}
           </button>
 
@@ -218,7 +222,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
 
           <div className="grid max-h-44 gap-1 overflow-auto pr-1">
             {playlists.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-neutral-500">Sin playlists</p>
+              <p className="px-2 py-1 text-xs text-neutral-500">{t("Sin playlists")}</p>
             ) : (
               playlists.map((playlist) => {
                 const isSaved = savedPlaylistIds.has(playlist.id)
@@ -241,12 +245,11 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
             <input
               value={newPlaylistName}
               onChange={(event) => setNewPlaylistName(event.target.value)}
-              placeholder="Nueva playlist"
+              placeholder={t("Nueva playlist")}
               className="min-w-0 flex-1 rounded border border-neutral-800 bg-neutral-900 px-2 text-sm outline-none focus:border-neutral-600"
             />
             <button type="submit" className="wt-action rounded px-2 text-sm font-medium">
-              Crear
-            </button>
+              {t("Crear")}</button>
           </form>
 
           {status && <p className="mt-2 px-2 text-xs text-neutral-400">{status}</p>}
@@ -257,9 +260,10 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
 }
 
 export function VideoSaveActions({ video, className = '', buttonClassName, label, menuPosition }: Omit<VideoSaveButtonProps, 'mode'>) {
+  useLocale()
   return <div className={`flex items-center gap-1 ${className}`}>
     <VideoSaveButton mode="saved" className="relative" video={video} buttonClassName={buttonClassName} label={label} />
     <VideoSaveButton mode="playlists" className="relative" video={video} buttonClassName={buttonClassName}
-      label={label ? 'Playlists' : undefined} menuPosition={menuPosition} />
+      label={label ? t("Playlists") : undefined} menuPosition={menuPosition} />
   </div>
 }

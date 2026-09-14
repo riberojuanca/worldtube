@@ -12,8 +12,8 @@ import { parseWebmCues, parseWebmTimingInfo } from './webmCues'
 
 export const SABR_JSON_MIME = 'application/sabr+json'
 
-export function buildSabrManifestUri(manifest: SabrManifestInfo): string {
-  return `data:${SABR_JSON_MIME},${encodeURIComponent(JSON.stringify(manifest))}`
+export function buildSabrManifestUri(manifest: SabrManifestInfo, sessionId: string): string {
+  return `data:${SABR_JSON_MIME},${encodeURIComponent(JSON.stringify({ ...manifest, sabrSessionId: sessionId }))}`
 }
 
 const CODECS_RE = /codecs="?([^",]+)"?/
@@ -29,9 +29,10 @@ function codecsOf(mimeType: string): string {
  */
 async function fetchInitResponse(
   format: SabrFormatInfo,
-  networkingEngine: shaka.net.NetworkingEngine
+  networkingEngine: shaka.net.NetworkingEngine,
+  sessionId: string
 ): Promise<ArrayBuffer> {
-  const uri = buildInitUri(isAudioFormat(format) ? 'audio' : 'video', keyOfFormatInfo(format))
+  const uri = buildInitUri(isAudioFormat(format) ? 'audio' : 'video', keyOfFormatInfo(format), sessionId)
 
   const request: shaka.extern.Request = {
     method: 'GET',
@@ -78,15 +79,16 @@ async function buildSegmentIndex(
   format: SabrFormatInfo,
   stream: shaka.extern.Stream,
   durationSeconds: number,
-  networkingEngine: shaka.net.NetworkingEngine
+  networkingEngine: shaka.net.NetworkingEngine,
+  sessionId: string
 ): Promise<shaka.media.SegmentIndex> {
-  const initResponse = await fetchInitResponse(format, networkingEngine)
+  const initResponse = await fetchInitResponse(format, networkingEngine, sessionId)
   const initData = initResponse.slice(format.initRange.start, format.initRange.end + 1)
   const indexData = initResponse.slice(format.indexRange.start, format.indexRange.end + 1)
 
   const kind = isAudioFormat(format) ? 'audio' : 'video'
   const key = keyOfFormatInfo(format)
-  const initUri = buildInitUri(kind, key)
+  const initUri = buildInitUri(kind, key, sessionId)
 
   const initSegmentReference = new shaka.media.InitSegmentReference(
     () => [initUri],
@@ -191,7 +193,8 @@ function createAudioStream(
   format: SabrFormatInfo,
   id: number,
   durationSeconds: number,
-  networkingEngine: shaka.net.NetworkingEngine
+  networkingEngine: shaka.net.NetworkingEngine,
+  sessionId: string
 ): shaka.extern.Stream {
   const stream: shaka.extern.Stream = {
     ...baseStreamFields(),
@@ -213,7 +216,7 @@ function createAudioStream(
     segmentIndex: null,
     createSegmentIndex: async () => {
       if (stream.segmentIndex) return
-      stream.segmentIndex = await buildSegmentIndex(format, stream, durationSeconds, networkingEngine)
+      stream.segmentIndex = await buildSegmentIndex(format, stream, durationSeconds, networkingEngine, sessionId)
     },
     closeSegmentIndex: () => {
       stream.segmentIndex?.release()
@@ -227,7 +230,8 @@ function createVideoStream(
   format: SabrFormatInfo,
   id: number,
   durationSeconds: number,
-  networkingEngine: shaka.net.NetworkingEngine
+  networkingEngine: shaka.net.NetworkingEngine,
+  sessionId: string
 ): shaka.extern.Stream {
   const hdr =
     format.colorTransferCharacteristics === 'SMPTEST2084'
@@ -261,7 +265,7 @@ function createVideoStream(
     segmentIndex: null,
     createSegmentIndex: async () => {
       if (stream.segmentIndex) return
-      stream.segmentIndex = await buildSegmentIndex(format, stream, durationSeconds, networkingEngine)
+      stream.segmentIndex = await buildSegmentIndex(format, stream, durationSeconds, networkingEngine, sessionId)
     },
     closeSegmentIndex: () => {
       stream.segmentIndex?.release()
@@ -293,7 +297,8 @@ export class SabrManifestParser implements shaka.extern.ManifestParser {
     this.networkingEngine = playerInterface.networkingEngine
 
     const prefixLength = `data:${SABR_JSON_MIME},`.length
-    const data: SabrManifestInfo = JSON.parse(decodeURIComponent(uri.slice(prefixLength)))
+    const data: SabrManifestInfo & { sabrSessionId: string } = JSON.parse(decodeURIComponent(uri.slice(prefixLength)))
+    if (!data.sabrSessionId) throw new Error('SABR manifest session missing')
 
     const timeline = new shaka.media.PresentationTimeline(0, 0, true)
     timeline.setStatic(true)
@@ -307,9 +312,9 @@ export class SabrManifestParser implements shaka.extern.ManifestParser {
 
     for (const format of data.formats) {
       if (isAudioFormat(format)) {
-        audioStreams.push(createAudioStream(format, nextId++, data.durationSeconds, this.networkingEngine))
+        audioStreams.push(createAudioStream(format, nextId++, data.durationSeconds, this.networkingEngine, data.sabrSessionId))
       } else {
-        videoStreams.push(createVideoStream(format, nextId++, data.durationSeconds, this.networkingEngine))
+        videoStreams.push(createVideoStream(format, nextId++, data.durationSeconds, this.networkingEngine, data.sabrSessionId))
       }
     }
 

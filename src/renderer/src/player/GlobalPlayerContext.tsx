@@ -1,3 +1,4 @@
+import { t, useLocale } from '../i18n/LocaleContext'
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CaptionTrack, SabrManifestInfo, SabrStreamInfo, SearchResultItem } from '../../../shared/ipc'
 
@@ -59,6 +60,7 @@ export const initialState: GlobalPlayerState = {
 export const GlobalPlayerContext = createContext<GlobalPlayerContextValue | null>(null)
 
 export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { children: ReactNode; tabId?: string; onOpenShort?: () => void }) {
+  useLocale()
   const [state, setState] = useState<GlobalPlayerState>(initialState)
   const [shorts, setShorts] = useState<SearchResultItem[]>([])
 
@@ -79,6 +81,10 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
 
     try {
       await playVideoImpl(videoId)
+    } catch (error) {
+      if (inFlightVideoIdRef.current === videoId) {
+        setState((prev) => ({ ...prev, status: 'error', error: error instanceof Error ? error.message : String(error) }))
+      }
     } finally {
       if (inFlightVideoIdRef.current === videoId) {
         inFlightVideoIdRef.current = null
@@ -120,7 +126,7 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
         dashManifest: null,
         sabr: null,
         status: 'error',
-        error: 'No se pudo generar un manifest reproducible para este video (ver logs del proceso principal).'
+        error: t("No se pudo generar un manifest reproducible para este video (ver logs del proceso principal).")
       }))
       return
     }

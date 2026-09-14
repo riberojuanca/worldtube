@@ -22,8 +22,11 @@ function uniqueValues(values: Array<string | null | undefined>): string[] {
   return values.filter((value, index): value is string => Boolean(value) && values.indexOf(value) === index)
 }
 
-function thumbnailCandidates(videoId: string, thumbnailUrl: string | null): string[] {
+function thumbnailCandidates(videoId: string, thumbnailUrl: string | null, portrait: boolean): string[] {
   return uniqueValues([
+    portrait ? thumbnailUrl : null,
+    `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+    `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
     thumbnailUrl,
     `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
@@ -31,13 +34,13 @@ function thumbnailCandidates(videoId: string, thumbnailUrl: string | null): stri
   ])
 }
 
-export function VideoThumbnail({ videoId, thumbnailUrl, title }: { videoId: string; thumbnailUrl: string | null; title: string }) {
-  const urls = useMemo(() => thumbnailCandidates(videoId, thumbnailUrl), [thumbnailUrl, videoId])
+export function VideoThumbnail({ videoId, thumbnailUrl, title, portrait = false }: { videoId: string; thumbnailUrl: string | null; title: string; portrait?: boolean }) {
+  const urls = useMemo(() => thumbnailCandidates(videoId, thumbnailUrl, portrait), [thumbnailUrl, videoId, portrait])
   const [urlIndex, setUrlIndex] = useState(0)
 
   useEffect(() => {
     setUrlIndex(0)
-  }, [thumbnailUrl, videoId])
+  }, [thumbnailUrl, videoId, portrait])
 
   const currentUrl = urls[urlIndex]
 
@@ -56,7 +59,11 @@ export function VideoThumbnail({ videoId, thumbnailUrl, title }: { videoId: stri
       alt=""
       className="h-full w-full object-cover"
       loading="lazy"
-      onError={() => setUrlIndex((index) => index + 1)}
+      decoding="async"
+      onLoad={(event) => {
+        if (event.currentTarget.naturalWidth <= 120 && urlIndex < urls.length - 1) setUrlIndex((index) => index === urlIndex ? index + 1 : index)
+      }}
+      onError={() => setUrlIndex((index) => index === urlIndex ? index + 1 : index)}
     />
   )
 }
@@ -68,7 +75,7 @@ export function VideoCard({ videoId, title, channelId, channelName, thumbnailUrl
     <div className="group flex flex-col gap-2 rounded p-1 hover:bg-neutral-900">
       <div className={`relative w-full rounded bg-neutral-900 ${portrait ? 'aspect-[9/16]' : 'aspect-video'}`}>
         <Link to={`/watch/${videoId}`} onClick={open} className="block h-full w-full overflow-hidden rounded" aria-label={title}>
-          <VideoThumbnail videoId={videoId} thumbnailUrl={thumbnailUrl} title={title} />
+          <VideoThumbnail videoId={videoId} thumbnailUrl={thumbnailUrl} title={title} portrait={portrait} />
           {badge && (
             <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-xs font-medium">
               {badge}

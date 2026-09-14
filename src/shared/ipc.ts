@@ -1,6 +1,12 @@
 // Shared between main and renderer so both sides agree on channel names and payload shapes.
 
 export const IPC_CHANNELS = {
+  APP_PREFERENCES_GET: 'app:preferences-get',
+  APP_PREFERENCES_SET: 'app:preferences-set',
+  UPDATES_STATE: 'updates:state',
+  UPDATES_CHECK: 'updates:check',
+  UPDATES_DOWNLOAD: 'updates:download',
+  UPDATES_INSTALL: 'updates:install',
   GET_VIDEO_INFO: 'youtube:get-video-info',
   SEARCH: 'youtube:search',
   SEARCH_SUGGESTIONS: 'youtube:search-suggestions',
@@ -35,6 +41,14 @@ export const IPC_CHANNELS = {
   SUBSCRIPTIONS_ADD: 'subscriptions:add',
   SUBSCRIPTIONS_REMOVE: 'subscriptions:remove'
 } as const
+
+export interface UpdateState {
+  status: 'development' | 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'error'
+  currentVersion: string
+  version?: string
+  percent?: number
+  error?: string
+}
 
 export interface LocalUser {
   id: string
@@ -187,7 +201,29 @@ export interface PlayerAudioPreferences {
   muted: boolean
 }
 
-export type SearchResponse = { ok: true; data: SearchResultItem[] } | { ok: false; error: string }
+export interface RecommendedChannel {
+  channelId: string
+  name: string
+  thumbnailUrl: string | null
+  subscriberCountText: string | null
+  description: string | null
+}
+
+export interface HomeSection {
+  id: string
+  title: string
+  topic?: string | null
+  liveQuery?: string
+  videos: SearchResultItem[]
+}
+
+export interface HomeDiscovery {
+  sections: HomeSection[]
+  liveVideos: SearchResultItem[]
+  channels: RecommendedChannel[]
+}
+
+export type SearchResponse = { ok: true; data: SearchResultItem[]; channels?: RecommendedChannel[]; home?: HomeDiscovery } | { ok: false; error: string }
 
 export type SearchSuggestionsResponse = { ok: true; data: string[] } | { ok: false; error: string }
 

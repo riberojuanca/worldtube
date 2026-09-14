@@ -1,3 +1,4 @@
+import { t, useLocale } from '../i18n/LocaleContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -17,9 +18,14 @@ import { useGlobalPlayer } from './GlobalPlayerContext'
 import { PLAYER_COMMAND_EVENT, PLAYER_SEEK_EVENT, PLAYER_STATE_EVENT, type PlayerCommandDetail, type PlayerStateDetail } from './events'
 import { startSabrSession, type SabrSession } from './sabr'
 
-function describeError(error: unknown): unknown {
+function describeError(error: unknown, depth = 0): unknown {
+  if (depth > 5) return '[nested error]'
   if (error instanceof shaka.util.Error) {
-    return { code: error.code, category: error.category, severity: error.severity, data: error.data }
+    return { code: error.code, category: error.category, severity: error.severity, data: error.data.map((item: unknown) => describeError(item, depth + 1)) }
+  }
+  if (error instanceof Error) {
+    const detail = error as Error & { severity?: unknown; cause?: unknown }
+    return { name: detail.name, message: detail.message, severity: detail.severity, cause: detail.cause ? describeError(detail.cause, depth + 1) : undefined }
   }
   return error
 }
@@ -31,8 +37,11 @@ function describeError(error: unknown): unknown {
 // showing the "No se pudo reproducir" overlay for.
 const LOAD_INTERRUPTED_CODE = 7000
 
-function isLoadInterrupted(error: unknown): boolean {
-  return error instanceof shaka.util.Error && error.code === LOAD_INTERRUPTED_CODE
+function isLoadInterrupted(error: unknown, depth = 0): boolean {
+  if (!(error instanceof shaka.util.Error) || depth > 5) return false
+  const { Code } = shaka.util.Error
+  if (error.code === LOAD_INTERRUPTED_CODE || error.code === Code.OPERATION_ABORTED) return true
+  return (error.code === Code.REQUEST_FILTER_ERROR || error.code === Code.RESPONSE_FILTER_ERROR) && isLoadInterrupted(error.data[0], depth + 1)
 }
 
 /**
@@ -70,11 +79,12 @@ export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
  * the element (and the shaka.Player attached to it) never unmounts.
  */
 export function GlobalPlayerHost() {
+  const { language } = useLocale()
   const { videoId, dashManifest, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
   const location = useLocation()
   const navigate = useNavigate()
   const { activeId: activeTabId } = useAppTabs()
-  const { id: tabId, active: isTabActive } = usePageTab()
+  const { id: tabId, active: isTabActive, revision } = usePageTab()
   const { ownerId, shouldAutoplay } = usePlayerWorkspace()
   const watchSlotId = `${WATCH_SLOT_ID}-${tabId}`
   const miniSlotId = `${MINI_SLOT_ID}-${tabId}`
@@ -100,6 +110,7 @@ export function GlobalPlayerHost() {
   // wouldn't trigger the effect that creates it (see below).
   const [rawVideoEl, setRawVideoEl] = useState<HTMLVideoElement | null>(null)
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null)
+  const [attachedPlayer, setAttachedPlayer] = useState<shaka.Player | null>(null)
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null)
   // shaka.Player.load() rejecting was previously only logged to the console —
   // from the user's side the video area just stayed black forever with zero
@@ -134,7 +145,7 @@ export function GlobalPlayerHost() {
       `[player-slot] isWatchRoute=${isWatchRoute} watchSlotFound=${Boolean(watchSlot)} miniSlotFound=${Boolean(miniSlot)} -> using ${slot ? (slot.id || 'hidden-home') : 'hidden-home (no slot found!)'}`
     )
     movePortalMount(slot)
-  }, [isWatchRoute, videoId, location.pathname, portalMount, shorts.length, activeTabId, ownerId, tabId, watchSlotId, miniSlotId, shortsSlotId])
+  }, [isWatchRoute, videoId, location.pathname, portalMount, shorts.length, activeTabId, ownerId, tabId, watchSlotId, miniSlotId, shortsSlotId, revision])
 
   useEffect(() => {
     return () => portalMount.remove()
@@ -168,20 +179,26 @@ export function GlobalPlayerHost() {
     player.configure({ preferredAudio: [{ role: 'main' }] })
 
     const handlePlayerError = (event: unknown) => {
+      if (disposed) return
       const rawError = (event as { detail?: unknown }).detail ?? event
       const description = describeError(rawError)
       if (isLoadInterrupted(rawError)) {
         console.info(`shaka player load interrupted: ${JSON.stringify(description)}`)
         return
       }
-      console.error(`shaka player error: ${JSON.stringify(description)}`)
-      setLoadError(`Error de reproducción: ${JSON.stringify(description)}`)
+      if (rawError instanceof shaka.util.Error && rawError.severity === shaka.util.Error.Severity.RECOVERABLE && rawError.category === shaka.util.Error.Category.NETWORK) {
+        console.warn(`shaka recoverable network error [tab=${tabId}]: ${JSON.stringify(description)}`)
+        return
+      }
+      console.error(`shaka player error [tab=${tabId}]: ${JSON.stringify(description)}`)
+      setLoadError(`${t('Error de reproducción')}: ${JSON.stringify(description)}`)
     }
     const handleVideoError = () => console.error(`video element error: ${JSON.stringify(rawVideoEl.error)}`)
 
     playerRef.current = player
     uiRef.current = ui
     setVideoEl(null)
+    setAttachedPlayer(null)
     player.addEventListener('error', handlePlayerError)
     rawVideoEl.addEventListener('error', handleVideoError)
 
@@ -195,6 +212,7 @@ export function GlobalPlayerHost() {
           rawVideoEl.muted = audio.muted
         }
         setVideoEl(rawVideoEl)
+        setAttachedPlayer(player)
       })
       .catch((error: unknown) => console.error(`shaka attach failed: ${JSON.stringify(describeError(error))}`))
 
@@ -207,6 +225,7 @@ export function GlobalPlayerHost() {
       playerRef.current = null
       uiRef.current = null
       setVideoEl(null)
+      setAttachedPlayer(null)
       ui.destroy().catch((error: unknown) => console.error(`shaka ui destroy failed: ${JSON.stringify(describeError(error))}`))
     }
   }, [rawVideoEl, containerEl])
@@ -214,19 +233,20 @@ export function GlobalPlayerHost() {
   useEffect(() => {
     const ui = uiRef.current
     if (!ui) return
+    ui.getControls()?.getLocalization().changeLocale([language])
     ui.configure({
       seekBarColors: { base: 'var(--wt-track)', buffered: 'var(--wt-buffered)', played: 'var(--wt-accent)', adBreaks: 'var(--wt-important)', chapters: 'var(--wt-important)' },
       volumeBarColors: { base: 'var(--wt-track)', level: 'var(--wt-accent)' },
       playbackRateBarColors: { base: 'var(--wt-track)', level: 'var(--wt-accent)' },
       controlPanelElements: isWatchRoute && shorts.length === 0 ? fullControlPanelRef.current
       : ['play_pause', 'mute', 'volume', 'time_and_duration', 'spacer', 'queue', 'overflow_menu', 'fullscreen'] })
-  }, [isWatchRoute, shorts.length, rawVideoEl, containerEl])
+  }, [isWatchRoute, shorts.length, rawVideoEl, containerEl, language])
 
   useEffect(() => {
     if (!videoEl || typeof window.api.setPlayerAudioPreferences !== 'function') return
     const saveAudio = () => {
       void window.api.setPlayerAudioPreferences({ volume: videoEl.volume, muted: videoEl.muted })
-        .catch((error) => console.warn('No se pudo guardar el volumen', error))
+        .catch((error) => console.warn(t("No se pudo guardar el volumen"), error))
     }
     videoEl.addEventListener('volumechange', saveAudio)
     return () => videoEl.removeEventListener('volumechange', saveAudio)
@@ -318,10 +338,11 @@ export function GlobalPlayerHost() {
   }, [videoEl, videoId, shorts, openShort, relatedVideos, playVideo, isWatchRoute, navigate, ownerId, tabId, shortsSlotId])
 
   useEffect(() => {
-    const player = playerRef.current
+    const player = attachedPlayer
     // `videoEl` is only set after `attach(video)` resolves in the FreeTube Lab
     // order above, so reaching this point means Shaka has a media element.
-    if (!player || !videoEl) return
+    if (!player || player !== playerRef.current || !videoEl) return
+    let cancelled = false
 
     if (loadedVideoRef.current) {
       positionsRef.current.set(loadedVideoRef.current, videoEl.currentTime)
@@ -351,6 +372,7 @@ export function GlobalPlayerHost() {
     if (sabr) {
       const session = startSabrSession(player, sabr.manifest, sabr.stream, {
         onReloadRequested: () => {
+          if (cancelled) return
           // YouTube's ABR server says this stream is no longer valid (expired
           // token, etc). We don't have a narrower "just refresh the stream"
           // path yet, so re-run the whole getVideoInfo pipeline — see the
@@ -366,7 +388,7 @@ export function GlobalPlayerHost() {
       player
         .load(session.manifestUri, resumeAt)
         .then(() => {
-          if (player.getAssetUri() !== session.manifestUri) return
+          if (cancelled || player.getAssetUri() !== session.manifestUri) return
           loadedVideoRef.current = videoId
           console.log(`[timing] shaka load() (sabr) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
           void loadThumbnailsTrack(player, storyboardVtt)
@@ -378,48 +400,57 @@ export function GlobalPlayerHost() {
           if (element) element.currentTime = pending.seconds
         })
         .catch((error: unknown) => {
+          if (cancelled) return
           const description = describeError(error)
           if (isLoadInterrupted(error)) {
             console.info(`shaka load (sabr) interrupted: ${JSON.stringify(description)}`)
             return
           }
-          console.error(`shaka load (sabr) failed: ${JSON.stringify(description)}`)
-          setLoadError(`No se pudo reproducir: ${JSON.stringify(description)}`)
+          console.error(`shaka load (sabr) failed [tab=${tabId}, video=${videoId}]: ${JSON.stringify(description)}`)
+          setLoadError(`${t('No se pudo reproducir')}: ${JSON.stringify(description)}`)
         })
-      return () => element?.removeEventListener('playing', onPlaying)
+      return () => {
+        cancelled = true
+        element?.removeEventListener('playing', onPlaying)
+      }
     }
 
     if (!dashManifest) {
       player.unload().catch(() => {})
-      return () => element?.removeEventListener('playing', onPlaying)
+      return () => {
+        cancelled = true
+        element?.removeEventListener('playing', onPlaying)
+      }
     }
 
     const manifestUri = URL.createObjectURL(new Blob([dashManifest], { type: 'application/dash+xml' }))
     player
       .load(manifestUri, resumeAt)
       .then(() => {
-        if (player.getAssetUri() !== manifestUri) return
+        if (cancelled || player.getAssetUri() !== manifestUri) return
         loadedVideoRef.current = videoId
         console.log(`[timing] shaka load() (dash) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
         void loadThumbnailsTrack(player, storyboardVtt)
         if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) void videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
       })
       .catch((error: unknown) => {
+        if (cancelled) return
         const description = describeError(error)
         if (isLoadInterrupted(error)) {
           console.info(`shaka load interrupted: ${JSON.stringify(description)}`)
           return
         }
         console.error(`shaka load failed: ${JSON.stringify(description)}`)
-        setLoadError(`No se pudo reproducir: ${JSON.stringify(description)}`)
+        setLoadError(`${t('No se pudo reproducir')}: ${JSON.stringify(description)}`)
       })
 
     return () => {
+      cancelled = true
       URL.revokeObjectURL(manifestUri)
       element?.removeEventListener('playing', onPlaying)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashManifest, sabr, videoEl])
+  }, [dashManifest, sabr, videoEl, attachedPlayer])
 
   useEffect(() => {
     return () => sabrSessionRef.current?.dispose()
@@ -564,8 +595,7 @@ export function GlobalPlayerHost() {
                 onClick={() => videoId && playVideo(videoId)}
                 className="wt-action rounded px-3 py-1.5 text-sm font-medium"
               >
-                Reintentar
-              </button>
+                {t("Reintentar")}</button>
             </div>
           )}
         </div>,

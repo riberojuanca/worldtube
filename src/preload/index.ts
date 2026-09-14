@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc'
+import type { AppPreferences } from '../shared/locale'
+import type { UpdateState } from '../shared/ipc'
 import type {
   ChannelResponse,
   PlayerAudioPreferences,
@@ -27,6 +29,17 @@ import type {
 } from '../shared/ipc'
 
 const api = {
+  getAppPreferences: (): Promise<AppPreferences> => ipcRenderer.invoke(IPC_CHANNELS.APP_PREFERENCES_GET),
+  setAppPreferences: (preferences: AppPreferences): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_PREFERENCES_SET, preferences),
+  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_STATE),
+  checkForUpdates: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_CHECK),
+  downloadUpdate: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_DOWNLOAD),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_INSTALL),
+  onUpdateState: (listener: (state: UpdateState) => void): (() => void) => {
+    const receive = (_event: Electron.IpcRendererEvent, state: UpdateState) => listener(state)
+    ipcRenderer.on(IPC_CHANNELS.UPDATES_STATE, receive)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATES_STATE, receive)
+  },
   getPlayerAudioPreferences: (): Promise<PlayerAudioPreferences> => ipcRenderer.invoke(IPC_CHANNELS.PLAYER_AUDIO_GET),
   setPlayerAudioPreferences: (audio: PlayerAudioPreferences): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.PLAYER_AUDIO_SET, audio),
   getVideoInfo: (videoId: string): Promise<VideoInfoResponse> =>

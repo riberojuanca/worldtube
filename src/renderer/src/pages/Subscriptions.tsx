@@ -1,3 +1,4 @@
+import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChannelAvatar } from '../components/ChannelAvatar'
@@ -8,6 +9,7 @@ import type { SearchResultItem, Subscription } from '../../../shared/ipc'
 type FeedStatus = 'loading' | 'ready' | 'error'
 
 export function Subscriptions() {
+  useLocale()
   const [subs, setSubs] = useState<Subscription[] | null>(null)
   const [feedStatus, setFeedStatus] = useState<FeedStatus>('loading')
   const [feed, setFeed] = useState<SearchResultItem[]>([])
@@ -39,15 +41,14 @@ export function Subscriptions() {
     }
   }, [activeProfileId])
 
-  if (subs === null) return <p className="text-sm text-neutral-400">Cargando…</p>
+  if (subs === null) return <p className="text-sm text-neutral-400">{t("Cargando…")}</p>
 
   if (subs.length === 0) {
     return (
       <div>
-        <h1 className="mb-4 text-xl font-semibold">Suscripciones</h1>
+        <h1 className="mb-4 text-xl font-semibold">{t("Suscripciones")}</h1>
         <p className="text-sm text-neutral-400">
-          No estás suscripto a ningún canal. Entrá a un canal desde un video y tocá "Suscribirse".
-        </p>
+          {t("No estás suscripto a ningún canal. Entrá a un canal desde un video y tocá \"Suscribirse\".")}</p>
       </div>
     )
   }
@@ -67,10 +68,10 @@ export function Subscriptions() {
         ))}
       </div>
 
-      {feedStatus === 'loading' && <p className="text-sm text-neutral-400">Cargando videos…</p>}
+      {feedStatus === 'loading' && <p className="text-sm text-neutral-400">{t("Cargando videos…")}</p>}
       {feedStatus === 'error' && <p className="text-sm text-red-400">{feedError}</p>}
       {feedStatus === 'ready' && feed.length === 0 && (
-        <p className="text-sm text-neutral-400">Ninguno de tus canales suscriptos tiene videos disponibles.</p>
+        <p className="text-sm text-neutral-400">{t("Ninguno de tus canales suscriptos tiene videos disponibles.")}</p>
       )}
       {feedStatus === 'ready' && feed.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

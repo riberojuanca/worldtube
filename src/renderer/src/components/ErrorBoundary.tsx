@@ -1,3 +1,4 @@
+import { t, LocaleContext } from '../i18n/LocaleContext'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface Props {
@@ -18,6 +19,7 @@ interface State {
  * from the crashed page remounts a fresh boundary automatically.
  */
 export class ErrorBoundary extends Component<Props, State> {
+  static contextType = LocaleContext
   state: State = { error: null }
 
   static getDerivedStateFromError(error: Error): State {
@@ -32,11 +34,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="mx-auto max-w-xl rounded-lg border border-red-900 bg-red-950/40 p-4">
-          <p className="font-medium text-red-300">Esta página tuvo un error y no se pudo mostrar.</p>
-          <p className="mt-1 text-sm text-neutral-400">{this.state.error.message}</p>
+          <p className="font-medium text-red-300">{t("Esta página tuvo un error y no se pudo mostrar.")}</p>
+          <p className="mt-1 text-sm text-neutral-400">{t(this.state.error.message)}</p>
           <a href="#/" className="wt-action mt-3 inline-block rounded px-3 py-1.5 text-sm font-medium">
-            Volver al inicio
-          </a>
+            {t("Volver al inicio")}</a>
         </div>
       )
     }

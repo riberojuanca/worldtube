@@ -2,7 +2,7 @@ import shaka from 'shaka-player/dist/shaka-player.ui.js'
 import { SabrStreamingAdapter } from 'googlevideo/sabr-streaming-adapter'
 import type { ReloadPlaybackContext } from 'googlevideo/protos'
 import type { SabrManifestInfo, SabrStreamInfo } from '../../../../shared/ipc'
-import { ShakaSabrPlayerAdapter, ensureSabrSchemeRegistered, setActiveSabrPlayerAdapter } from './playerAdapter'
+import { ShakaSabrPlayerAdapter, ensureSabrSchemeRegistered, registerSabrPlayerAdapter } from './playerAdapter'
 import { buildSabrManifestUri, ensureSabrManifestParserRegistered } from './manifestParser'
 import { toGoogleVideoFormat } from './format'
 
@@ -28,6 +28,8 @@ export interface SabrSession {
  * `player.load()` and a `dispose()` to call before starting the next one.
  */
 export function startSabrSession(player: shaka.Player, manifest: SabrManifestInfo, stream: SabrStreamInfo, callbacks: SabrSessionCallbacks): SabrSession {
+  const sessionId = crypto.randomUUID()
+  let disposed = false
   const playerAdapter = new ShakaSabrPlayerAdapter()
 
   const sabrAdapter = new SabrStreamingAdapter({
@@ -42,7 +44,7 @@ export function startSabrSession(player: shaka.Player, manifest: SabrManifestInf
 
   sabrAdapter.onMintPoToken(async () => stream.poToken)
   sabrAdapter.onReloadPlayerResponse(async (context) => {
-    callbacks.onReloadRequested(context)
+    if (!disposed) callbacks.onReloadRequested(context)
   })
 
   sabrAdapter.attach(player)
@@ -50,15 +52,14 @@ export function startSabrSession(player: shaka.Player, manifest: SabrManifestInf
   sabrAdapter.setUstreamerConfig(stream.ustreamerConfigB64)
   sabrAdapter.setServerAbrFormats(manifest.formats.map(toGoogleVideoFormat))
 
-  setActiveSabrPlayerAdapter(playerAdapter)
+  const unregister = registerSabrPlayerAdapter(sessionId, playerAdapter)
 
-  let disposed = false
   return {
-    manifestUri: buildSabrManifestUri(manifest),
+    manifestUri: buildSabrManifestUri(manifest, sessionId),
     dispose: () => {
       if (disposed) return
       disposed = true
-      setActiveSabrPlayerAdapter(null)
+      unregister()
       sabrAdapter.dispose()
     }
   }

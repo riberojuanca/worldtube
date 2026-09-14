@@ -2,8 +2,10 @@ import { Innertube, Platform, YTNodes } from 'youtubei.js'
 import { generatePoToken } from './poToken'
 import { buildSabrPayload } from './sabrManifest'
 import { evaluatePlayerScript } from './jsEvaluator'
-import { recordHistoryEntry } from './historyStore'
-import type { CaptionTrack, ChannelInfoResult, SearchResultItem, VideoInfoResult } from '../shared/ipc'
+import { getHistory, recordHistoryEntry } from './historyStore'
+import { getAppLanguage, listActiveSubscriptions } from './localDb'
+import { translateFor } from '../shared/locale'
+import type { CaptionTrack, ChannelInfoResult, HomeDiscovery, HomeSection, RecommendedChannel, SearchResultItem, VideoInfoResult } from '../shared/ipc'
 
 type VideoOrGridVideo =
   | InstanceType<typeof YTNodes.Video>
@@ -13,7 +15,13 @@ type VideoOrGridVideo =
 
 type LockupView = InstanceType<typeof YTNodes.LockupView>
 
-type TextLike = { text?: string; toString(): string }
+type ChannelEndpoint = { payload?: { browseId?: string } }
+type TextLike = {
+  text?: string
+  endpoint?: ChannelEndpoint
+  runs?: { text: string; endpoint?: ChannelEndpoint }[]
+  toString(): string
+}
 type MetadataPartLike = {
   text?: TextLike | null
   avatar_stack?: { text?: TextLike | null } | null
@@ -31,26 +39,6 @@ type CollectionThumbnailViewLike = {
 }
 type OverlayWithBadges = {
   badges?: { text?: string; badge_style?: string }[]
-}
-
-const VIEWS_OR_WATCHING_REGEX = /views?|watching|waiting/i
-const VIEWS_IN_NUMBER_ONLY = /^\d+(\.\d)?[bkm]?$/i
-const PREMIERES_TIME_REGEX = /^(premieres|scheduled for) /i
-const PUBLISH_TIME_REGEX = /^(streamed )?\d+ ?\w+? ago/i
-
-function isViewCountText(text: string | undefined): boolean {
-  if (typeof text !== 'string') return false
-  return VIEWS_OR_WATCHING_REGEX.test(text) || VIEWS_IN_NUMBER_ONLY.test(text)
-}
-
-function isPremieresTimeText(text: string | undefined): boolean {
-  if (typeof text !== 'string') return false
-  return PREMIERES_TIME_REGEX.test(text)
-}
-
-function isPublishTimeText(text: string | undefined): boolean {
-  if (typeof text !== 'string') return false
-  return PUBLISH_TIME_REGEX.test(text)
 }
 
 function textValue(text: TextLike | string | null | undefined): string | null {
@@ -75,7 +63,7 @@ function getLockupPrimaryThumbnail(lockup: LockupView): ThumbnailViewLike | null
 }
 
 export function getLockupThumbnailUrl(lockup: LockupView): string | null {
-  return getLockupPrimaryThumbnail(lockup)?.image?.at(-1)?.url ?? null
+  return getLockupPrimaryThumbnail(lockup)?.image?.[0]?.url ?? null
 }
 
 function getLockupDurationText(lockup: LockupView): string | null {
@@ -84,7 +72,10 @@ function getLockupDurationText(lockup: LockupView): string | null {
     const badges = (overlay as OverlayWithBadges).badges ?? []
     for (const badge of badges) {
       if (badge.badge_style === 'THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE') return null
-      if (badge.text && /^[\d:]+$/.test(badge.text)) return badge.text
+      const clock = badge.text?.split(':') ?? []
+      if (clock.length < 2 || clock.length > 3) continue
+      if (clock.every((part, index) => part.length > 0 && Array.from(part).every((digit) => digit >= '0' && digit <= '9') &&
+        (index === 0 || (part.length === 2 && Number(part) < 60)))) return badge.text ?? null
     }
   }
   return null
@@ -95,10 +86,15 @@ function getLockupMetadataRows(lockup: LockupView): MetadataRowLike[] {
 }
 
 function getLockupPublishedText(lockup: LockupView): string | null {
-  for (const row of getLockupMetadataRows(lockup)) {
-    const found = row.metadata_parts?.find((part) => isPublishTimeText(textValue(part.text) ?? undefined))
-    const text = textValue(found?.text)
-    if (text) return text
+  for (const part of getLockupMetadataRows(lockup).flatMap((row) => row.metadata_parts ?? [])) {
+    const label = textValue(part.text)
+    if (!label) continue
+    const words = label.toLowerCase().trim().split(/\s+/u)
+    const ago = words.indexOf('ago')
+    if (ago < 2) continue
+    const unit = words[ago - 1].endsWith('s') ? words[ago - 1].slice(0, -1) : words[ago - 1]
+    const amount = words[ago - 2] === 'a' ? 1 : Number(words[ago - 2])
+    if (Object.hasOwn(RELATIVE_TIME_UNIT_MS, unit) && Number.isFinite(amount) && amount >= 0) return label
   }
   return null
 }
@@ -107,27 +103,50 @@ function isMembersOnlyLockup(lockup: LockupView): boolean {
   return getLockupMetadataRows(lockup).some((row) => row.badges?.some((badge) => badge.style === 'BADGE_MEMBERS_ONLY'))
 }
 
-function getLockupChannelName(lockup: LockupView, fallbackChannelName = '(desconocido)'): string {
-  const firstPart = getLockupMetadataRows(lockup)[0]?.metadata_parts?.[0]
-  const maybeAuthor = textValue(firstPart?.text)
-  if (maybeAuthor && !isViewCountText(maybeAuthor) && !isPremieresTimeText(maybeAuthor)) {
-    return maybeAuthor
+function getLockupChannelName(lockup: LockupView, fallbackChannelName = '(unknown)'): string {
+  // Text endpoints/runs are part of YouTube.js's parsed model. Identify an
+  // author by a channel browse target, not by excluding English statistics.
+  for (const part of getLockupMetadataRows(lockup).flatMap((row) => row.metadata_parts ?? [])) {
+    for (const text of [part.text, part.avatar_stack?.text]) {
+      if (!text) continue
+      const channelRun = text.runs?.find((run) => run.endpoint?.payload?.browseId?.startsWith('UC'))
+      if (channelRun) return channelRun.text
+      if (text.endpoint?.payload?.browseId?.startsWith('UC')) return textValue(text) ?? fallbackChannelName
+    }
+    const avatarLabel = textValue(part.avatar_stack?.text)
+    if (avatarLabel) return avatarLabel
   }
-
-  return textValue(firstPart?.avatar_stack?.text) ?? fallbackChannelName
+  const avatarTarget = lockup.metadata?.image?.renderer_context?.command_context?.on_tap?.payload?.browseId
+  const authorRow = getLockupMetadataRows(lockup)[0]?.metadata_parts ?? []
+  // Some author labels omit navigation data; avoid treating statistics as names.
+  const label = textValue(authorRow[0]?.text)
+  if (label && label !== getLockupPublishedText(lockup)) {
+    const words = label.toLowerCase().trim().split(/\s+/u)
+    const statistics = ['views', 'view', 'watching', 'waiting', 'premieres', 'scheduled']
+    const beginsWithNumber = label[0] >= '0' && label[0] <= '9'
+    if (!words.some((word) => statistics.includes(word)) && (!beginsWithNumber || avatarTarget?.startsWith('UC'))) return label
+  }
+  return fallbackChannelName
 }
 
 function getLockupChannelId(lockup: LockupView, fallbackChannelId: string | null = null): string | null {
+  for (const part of getLockupMetadataRows(lockup).flatMap((row) => row.metadata_parts ?? [])) {
+    for (const text of [part.text, part.avatar_stack?.text]) {
+      const endpoints = [text?.endpoint, ...(text?.runs?.map((run) => run.endpoint) ?? [])]
+      const id = endpoints.find((endpoint) => endpoint?.payload?.browseId?.startsWith('UC'))?.payload?.browseId
+      if (id) return id
+    }
+  }
   return lockup.metadata?.image?.renderer_context?.command_context?.on_tap?.payload?.browseId ?? fallbackChannelId
 }
 
-function mapLockupView(lockup: LockupView, fallbackChannelId: string | null = null, fallbackChannelName = '(desconocido)'): SearchResultItem | null {
+function mapLockupView(lockup: LockupView, fallbackChannelId: string | null = null, fallbackChannelName = '(unknown)'): SearchResultItem | null {
   if (lockup.content_type !== 'VIDEO' && lockup.content_type !== 'STATION') return null
   if (isMembersOnlyLockup(lockup)) return null
 
   return {
     videoId: lockup.content_id,
-    title: textValue(lockup.metadata?.title) ?? '(sin título)',
+    title: textValue(lockup.metadata?.title) ?? translateFor(getAppLanguage(), '(untitled)'),
     channelId: getLockupChannelId(lockup, fallbackChannelId),
     channelName: getLockupChannelName(lockup, fallbackChannelName),
     thumbnailUrl: getLockupThumbnailUrl(lockup),
@@ -146,7 +165,7 @@ function mapLockupView(lockup: LockupView, fallbackChannelId: string | null = nu
 function mapVideoNodes(
   nodes: readonly VideoOrGridVideo[],
   fallbackChannelId: string | null = null,
-  fallbackChannelName = '(desconocido)'
+  fallbackChannelName = '(unknown)'
 ): SearchResultItem[] {
   // Video and CompactVideo share the same shape here (a `.duration` getter
   // returning `{ text }`, a non-nullable `.best_thumbnail`, and `.view_count`)
@@ -160,7 +179,7 @@ function mapVideoNodes(
       title: video.title.toString(),
       channelId: video.author?.id ?? fallbackChannelId,
       channelName: video.author?.name ?? fallbackChannelName,
-      thumbnailUrl: (isGridVideo || isCompactMovie ? video.thumbnails?.at(-1)?.url : video.best_thumbnail?.url) ?? null,
+      thumbnailUrl: (isGridVideo || isCompactMovie ? video.thumbnails?.[0]?.url : video.best_thumbnail?.url) ?? null,
       durationText: (isGridVideo ? video.duration?.toString() : video.duration.text) ?? null,
       viewCountText:
         (isCompactMovie ? null : video.short_view_count?.toString()) ??
@@ -174,7 +193,7 @@ function mapVideoNodes(
 export function mapSearchResultNodes(
   nodes: readonly unknown[],
   fallbackChannelId: string | null = null,
-  fallbackChannelName = '(desconocido)'
+  fallbackChannelName = '(unknown)'
 ): SearchResultItem[] {
   const videos: SearchResultItem[] = []
 
@@ -200,6 +219,23 @@ export function mapSearchResultNodes(
 
 function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
   return mapSearchResultNodes(nodes)
+}
+
+async function resolveChannelNames(videos: SearchResultItem[]): Promise<SearchResultItem[]> {
+  const missing = new Set(['', '(unknown)', '(desconocido)'])
+  const ids = [...new Set(videos.filter((video) => missing.has(video.channelName) && video.channelId?.startsWith('UC'))
+    .map((video) => video.channelId!))]
+  const names = new Map<string, string>()
+  for (let start = 0; start < ids.length; start += 4) {
+    await Promise.all(ids.slice(start, start + 4).map(async (id) => {
+      try {
+        const channel = await getChannelInfo(id, false)
+        if (channel.name && !missing.has(channel.name)) names.set(id, channel.name)
+      } catch { /* Keep missing metadata explicit if the header cannot be loaded. */ }
+    }))
+  }
+  return videos.map((video) => missing.has(video.channelName) && names.has(video.channelId ?? '')
+    ? { ...video, channelName: names.get(video.channelId!)! } : video)
 }
 
 // See jsEvaluator.ts — without this, deciphering (server_abr_streaming_url,
@@ -255,11 +291,19 @@ export function fetchVideoInfo(videoId: string): Promise<VideoInfoResult> {
   return promise
 }
 
-export async function searchVideos(query: string): Promise<SearchResultItem[]> {
+export async function searchVideos(query: string): Promise<{ videos: SearchResultItem[]; channels: RecommendedChannel[] }> {
   console.log(`[youtube] searchVideos(${query})`)
   const yt = await getClient()
-  const results = await yt.search(query, { type: 'video' })
-  return mapSearchResultNodes(results.results.filterType(YTNodes.Video, YTNodes.GridVideo, YTNodes.LockupView))
+  const results = await yt.search(query)
+  const channelNodes = results.channels.length ? results.channels :
+    (await yt.search(query, { type: 'channel' }).catch(() => null))?.channels ?? []
+  const channels = channelNodes.map((channel) => ({
+    channelId: channel.id, name: channel.author.name,
+    thumbnailUrl: channel.author.best_thumbnail?.url ?? null,
+    subscriberCountText: channel instanceof YTNodes.Channel ? channel.subscriber_count?.toString() ?? null : channel.subscribers?.toString() ?? null,
+    description: channel instanceof YTNodes.Channel ? channel.description_snippet?.toString() ?? null : null
+  }))
+  return { videos: await resolveChannelNames(mapSearchResultNodes(results.videos)), channels }
 }
 
 export async function getSearchSuggestions(query: string): Promise<string[]> {
@@ -271,12 +315,89 @@ export async function getSearchSuggestions(query: string): Promise<string[]> {
   return Array.isArray(suggestions) ? suggestions.filter((suggestion): suggestion is string => typeof suggestion === 'string') : []
 }
 
-export async function getHomeFeed(): Promise<SearchResultItem[]> {
+export async function getHomeFeed(sections: HomeSection[] = []): Promise<SearchResultItem[]> {
   console.log('[youtube] getHomeFeed()')
   const yt = await getClient()
   const feed = await yt.getHomeFeed()
+  const videos = mapSearchResultNodes(feed.videos)
+  console.log(`[youtube] home: ${feed.videos.length} video nodes, ${videos.length} mapped videos`)
+  if (videos.length) return videos
 
-  return mapSearchResultNodes(feed.videos.filterType(YTNodes.Video, YTNodes.GridVideo, YTNodes.LockupView))
+  // Anonymous home responses can have no recommendations. Use this profile's
+  // own recent viewing as seeds, without minting tokens or recording a watch.
+  const history = await getHistory()
+  const watched = new Set(history.map((entry) => entry.videoId))
+  const recommendations = await Promise.all(history.slice(0, 3).map(async (entry) => {
+    try {
+      const info = await yt.getInfo(entry.videoId)
+      const related = mapWatchNextFeed(info.watch_next_feed ?? []).filter((video) => !watched.has(video.videoId))
+      const keywords = info.basic_info.keywords?.filter((keyword) => keyword.trim().length > 0 && keyword.length <= 60) ?? []
+      return { entry, related, topic: info.basic_info.category,
+        liveQuery: keywords.slice(0, 2).join(' ') || entry.channelName || entry.title }
+    } catch (error) {
+      console.warn('[youtube] home recommendation seed failed:', error instanceof Error ? error.message : String(error))
+      return { entry, related: [] as SearchResultItem[], topic: null, liveQuery: entry.channelName || entry.title }
+    }
+  }))
+  const unique = new Map<string, SearchResultItem>()
+  for (const batch of recommendations) {
+    if (batch.related.length) sections.push({ id: batch.entry.videoId, title: batch.entry.title,
+      topic: batch.topic, liveQuery: batch.liveQuery, videos: batch.related })
+    for (const video of batch.related) {
+      if (!watched.has(video.videoId) && !unique.has(video.videoId)) unique.set(video.videoId, video)
+    }
+  }
+  if (unique.size) {
+    console.log(`[youtube] home: ${unique.size} recommendations from local history`)
+    return [...unique.values()]
+  }
+
+  const subscriptions = await listActiveSubscriptions()
+  if (subscriptions.length) {
+    const subscribedVideos = await getSubscriptionsFeed(subscriptions.slice(0, 6).map((channel) => channel.channelId))
+    console.log(`[youtube] home: ${subscribedVideos.length} videos from local subscriptions`)
+    return subscribedVideos
+  }
+  return []
+}
+
+export async function getHomeDiscovery(): Promise<{ videos: SearchResultItem[]; home: HomeDiscovery }> {
+  const sections: HomeSection[] = []
+  const history = await getHistory()
+  const subscriptions = await listActiveSubscriptions()
+  const videos = await resolveChannelNames(await getHomeFeed(sections))
+  const resolvedVideos = new Map(videos.map((video) => [video.videoId, video]))
+  for (const section of sections) section.videos = section.videos.map((video) => resolvedVideos.get(video.videoId) ?? video)
+  const excluded = new Set([...subscriptions.map((channel) => channel.channelId), ...history.map((entry) => entry.channelId)])
+  const counts = new Map<string, number>()
+  for (const video of videos) {
+    if (video.channelId && !excluded.has(video.channelId)) counts.set(video.channelId, (counts.get(video.channelId) ?? 0) + 1)
+  }
+  const ids = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id)
+  const channelsPromise = Promise.all(ids.map(async (id): Promise<RecommendedChannel | null> => {
+    try {
+      const info = await getChannelInfo(id, false)
+      return { channelId: id, name: info.name, thumbnailUrl: info.thumbnailUrl,
+        subscriberCountText: info.subscriberCountText, description: null }
+    } catch { return null }
+  }))
+  const livePromise = (async () => {
+    const yt = await getClient()
+    const queries = [...new Set(sections.length ? sections.slice(0, 2).map((section) => section.liveQuery || section.title)
+      : history.slice(0, 2).map((entry) => entry.channelName || entry.title))]
+    if (!queries.length && subscriptions[0]) queries.push(subscriptions[0].channelName)
+    const batches = await Promise.all(queries.map(async (query) => {
+      try {
+        const results = await yt.search(query, { type: 'video', features: ['live'] })
+        return mapSearchResultNodes(results.videos.filterType(YTNodes.Video).filter((video) => video.is_live))
+          .map((video) => ({ ...video, durationText: 'LIVE' }))
+      } catch { return [] }
+    }))
+    return [...new Map(batches.flat().map((video) => [video.videoId, video])).values()]
+  })()
+  const [channels, liveVideos] = await Promise.all([channelsPromise, livePromise])
+  console.log(`[youtube] home discovery: ${sections.length} sections, ${liveVideos.length} live videos, ${channels.filter(Boolean).length} channels`)
+  return { videos, home: { sections, liveVideos, channels: channels.filter((channel): channel is RecommendedChannel => channel !== null) } }
 }
 
 export async function getChannelInfo(channelId: string, includeVideos = true): Promise<ChannelInfoResult> {
@@ -285,13 +406,13 @@ export async function getChannelInfo(channelId: string, includeVideos = true): P
   const videosTab = includeVideos && channel.has_videos ? await channel.getVideos() : channel
   const header = channel.header as { author?: { id?: string; name?: string; best_thumbnail?: { url: string } }; subscribers?: { toString(): string } } | undefined
   const resolvedChannelId = header?.author?.id ?? channel.metadata.external_id ?? channelId
-  const channelName = header?.author?.name ?? channel.metadata.title ?? '(desconocido)'
+  const channelName = header?.author?.name ?? channel.metadata.title ?? translateFor(getAppLanguage(), '(unknown)')
   const pageHeader = channel.header instanceof YTNodes.PageHeader ? channel.header.content : null
   const pageImage = pageHeader?.image
-  const pageAvatar = pageImage instanceof YTNodes.DecoratedAvatarView ? pageImage.avatar?.image?.at(-1)?.url
-    : pageImage instanceof YTNodes.ContentPreviewImageView ? pageImage.image.at(-1)?.url : null
-  const bannerUrl = pageHeader?.banner?.image.at(-1)?.url ??
-    (channel.header instanceof YTNodes.C4TabbedHeader ? channel.header.banner?.at(-1)?.url : null)
+  const pageAvatar = pageImage instanceof YTNodes.DecoratedAvatarView ? pageImage.avatar?.image?.[0]?.url
+    : pageImage instanceof YTNodes.ContentPreviewImageView ? pageImage.image[0]?.url : null
+  const bannerUrl = pageHeader?.banner?.image[0]?.url ??
+    (channel.header instanceof YTNodes.C4TabbedHeader ? channel.header.banner?.[0]?.url : null)
   const metadataParts = pageHeader?.metadata?.metadata_rows.flatMap((row) => row.metadata_parts ?? []) ?? []
 
   const videos = includeVideos ? mapSearchResultNodes(videosTab.videos.filterType(YTNodes.Video, YTNodes.GridVideo, YTNodes.LockupView), resolvedChannelId, channelName) : []
@@ -299,7 +420,7 @@ export async function getChannelInfo(channelId: string, includeVideos = true): P
   return {
     channelId: resolvedChannelId,
     name: channelName,
-    thumbnailUrl: pageAvatar ?? header?.author?.best_thumbnail?.url ?? channel.metadata.avatar?.at(-1)?.url ?? channel.metadata.thumbnail?.at(-1)?.url ?? null,
+    thumbnailUrl: pageAvatar ?? header?.author?.best_thumbnail?.url ?? channel.metadata.avatar?.[0]?.url ?? channel.metadata.thumbnail?.[0]?.url ?? null,
     subscriberCountText: header?.subscribers?.toString() ?? metadataParts.map((part) => part.text?.toString()).find((text) => /subscribers|suscriptores/i.test(text ?? '')) ?? null,
     videos,
     description: channel.metadata.description ?? null,
@@ -424,33 +545,31 @@ function buildStoryboardVtt(storyboards: unknown, videoLengthSeconds: number | n
         rows: number
       }
     | undefined
-  if (!board || board.thumbnail_count <= 0) return null
+  if (!board || ![board.thumbnail_count, board.columns, board.rows, board.thumbnail_width, board.thumbnail_height]
+    .every((value) => Number.isSafeInteger(value) && value > 0)) return null
 
-  const tilesPerPage = board.columns * board.rows
-  const numberOfImages = Math.ceil(board.thumbnail_count / tilesPerPage)
-  const intervalInSeconds = board.interval > 0
-    ? board.interval / 1000
-    : (videoLengthSeconds ?? 0) / (numberOfImages * tilesPerPage)
-  const lines = ['WEBVTT', '']
-  let startSeconds = 0
+  const durationMs = videoLengthSeconds && Number.isFinite(videoLengthSeconds) && videoLengthSeconds > 0
+    ? videoLengthSeconds * 1000 : null
+  const stepMs = Number.isFinite(board.interval) && board.interval > 0
+    ? board.interval : (durationMs ?? 0) / board.thumbnail_count
+  if (stepMs <= 0) return null
 
-  for (let i = 0; i < numberOfImages; i++) {
-    const spriteUrl = board.template_url.replace('$M.jpg', `${i}.jpg`)
-    let x = 0
-    let y = 0
-
-    for (let j = 0; j < tilesPerPage; j++) {
-      const endSeconds = startSeconds + intervalInSeconds
-      lines.push(`${formatVttTimestamp(startSeconds * 1000)} --> ${formatVttTimestamp(endSeconds * 1000)}`)
-      lines.push(`${spriteUrl}#xywh=${x},${y},${board.thumbnail_width},${board.thumbnail_height}`)
-      lines.push('')
-
-      startSeconds = endSeconds
-      x = (x + board.thumbnail_width) % (board.thumbnail_width * board.columns)
-      if (x === 0) y += board.thumbnail_height
-    }
+  // Absolute tile indexing avoids accumulated timestamp drift and ignores
+  // unused cells on the final sprite sheet. Shaka consumes standard VTT cues.
+  const cues: string[] = []
+  const capacity = board.columns * board.rows
+  for (let tile = 0; tile < board.thumbnail_count; tile++) {
+    const startMs = tile * stepMs
+    if (durationMs !== null && startMs >= durationMs) break
+    const endMs = Math.min(startMs + stepMs, durationMs ?? Infinity)
+    const sheet = Math.floor(tile / capacity)
+    const cell = tile % capacity
+    const rectangle = [cell % board.columns * board.thumbnail_width,
+      Math.floor(cell / board.columns) * board.thumbnail_height, board.thumbnail_width, board.thumbnail_height]
+    const image = board.template_url.replaceAll('$M', String(sheet))
+    cues.push(`${formatVttTimestamp(startMs)} --> ${formatVttTimestamp(endMs)}\n${image}#xywh=${rectangle.join(',')}\n`)
   }
-  return lines.join('\n')
+  return cues.length ? `WEBVTT\n\n${cues.join('\n')}` : null
 }
 
 function getChannelThumbnailUrl(info: { secondary_info?: { owner?: { author?: { best_thumbnail?: { url: string }; avatar_thumbnail_url?: string } } | null } | null }): string | null {
@@ -458,11 +577,11 @@ function getChannelThumbnailUrl(info: { secondary_info?: { owner?: { author?: { 
 }
 
 function formatInteger(value: number): string {
-  return new Intl.NumberFormat('es-UY').format(value)
+  return new Intl.NumberFormat(getAppLanguage() === 'es' ? 'es-UY' : 'en-US').format(value)
 }
 
 function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat('es-UY', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat(getAppLanguage() === 'es' ? 'es-UY' : 'en-US', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }).format(value)
 }
 
 function formatDurationText(seconds: number | null | undefined): string | null {
@@ -481,7 +600,7 @@ function formatDateText(value: string | undefined): string | null {
   if (!value) return null
   const date = new Date(`${value}T00:00:00Z`)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('es-UY', { dateStyle: 'medium', timeZone: 'UTC' }).format(date)
+  return new Intl.DateTimeFormat(getAppLanguage() === 'es' ? 'es-UY' : 'en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(date)
 }
 
 function getViewCountText(info: {
@@ -490,7 +609,7 @@ function getViewCountText(info: {
 }): string | null {
   const viewCount = info.basic_info.view_count
   if (typeof viewCount === 'number' && Number.isFinite(viewCount)) {
-    return `${formatInteger(viewCount)} visualizaciones`
+    return translateFor(getAppLanguage(), '{count} views', { count: formatInteger(viewCount) })
   }
 
   return info.primary_info?.view_count?.view_count?.toString() ?? info.primary_info?.view_count?.short_view_count?.toString() ?? null
@@ -602,15 +721,15 @@ async function fetchVideoInfoUncached(videoId: string): Promise<VideoInfoResult>
 
   const result: VideoInfoResult = {
     videoId,
-    title: info.basic_info.title ?? '(sin título)',
+    title: info.basic_info.title ?? translateFor(getAppLanguage(), '(untitled)'),
     channelId: info.basic_info.channel?.id ?? null,
-    channelName: info.basic_info.channel?.name ?? '(desconocido)',
+    channelName: info.basic_info.channel?.name ?? translateFor(getAppLanguage(), '(unknown)'),
     channelThumbnailUrl: getChannelThumbnailUrl(info),
     subscriberCountText: getSubscriberCountText(info),
     captions: info.captions ? extractCaptionTracks(info.captions) : [],
     storyboardVtt: buildStoryboardVtt(info.storyboards, info.basic_info.duration ?? null),
-    relatedVideos: info.watch_next_feed ? mapWatchNextFeed(info.watch_next_feed) : [],
-    thumbnailUrl: info.basic_info.thumbnail?.at(-1)?.url ?? null,
+    relatedVideos: info.watch_next_feed ? await resolveChannelNames(mapWatchNextFeed(info.watch_next_feed)) : [],
+    thumbnailUrl: info.basic_info.thumbnail?.[0]?.url ?? null,
     lengthSeconds: info.basic_info.duration ?? null,
     durationText: formatDurationText(info.basic_info.duration ?? null),
     viewCountText: getViewCountText(info),

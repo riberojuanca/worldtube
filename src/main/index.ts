@@ -1,6 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { IPC_CHANNELS } from '../shared/ipc'
+import { translateFor } from '../shared/locale'
+import { registerUpdates, checkForUpdatesOnStartup } from './updates'
 import type {
   ChannelResponse,
   CreateLocalUserRequest,
@@ -19,12 +21,14 @@ import type {
   VideoInfoRequest,
   VideoInfoResponse
 } from '../shared/ipc'
-import { fetchVideoInfo, getChannelInfo, getHomeFeed, getSearchSuggestions, getSubscriptionsFeed, searchVideos } from './youtube'
+import { fetchVideoInfo, getChannelInfo, getHomeDiscovery, getSearchSuggestions, getSubscriptionsFeed, searchVideos } from './youtube'
 import { getChannelPage } from './channelBrowse'
 import type { ChannelPageRequest, ChannelPageResponse } from '../shared/ipc'
 import { clearHistory, getHistory } from './historyStore'
 import {
   createLocalUser,
+  getAppPreferences,
+  setAppPreferences,
   createActiveSavedPlaylist,
   deleteLocalUser,
   createUserProfile,
@@ -48,6 +52,12 @@ import {
 } from './localDb'
 import { addSubscription, listSubscriptions, removeSubscription } from './subscriptionsStore'
 
+// Keep the data directory identical in development and packaged installations.
+app.setName('worldtube')
+if (process.platform === 'linux') {
+  app.setDesktopName(app.isPackaged ? 'com.riberojuanca.worldtube.desktop' : 'com.riberojuanca.worldtube.dev.desktop')
+}
+
 // This dev machine doesn't have the setuid chrome-sandbox helper configured
 // (needs root-owned 4755, which we won't set from here), so Chromium's native
 // startup aborts before any of this file's JS runs — app.commandLine.appendSwitch()
@@ -56,7 +66,9 @@ import { addSubscription, listSubscriptions, removeSubscription } from './subscr
 // passed to the electron binary itself (see freetube-audio-lab's dev notes).
 
 function createWindow(): void {
+  const icon = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'resources/icon.png')
   const mainWindow = new BrowserWindow({
+    icon,
     width: 1280,
     height: 800,
     show: false,
@@ -136,7 +148,7 @@ ipcMain.handle(IPC_CHANNELS.SEARCH, async (_event, { query }: SearchRequest): Pr
       console.warn('[search-history] failed to record query', error)
     })
     const data = await searchVideos(query)
-    return { ok: true, data }
+    return { ok: true, data: data.videos, channels: data.channels }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -153,8 +165,8 @@ ipcMain.handle(IPC_CHANNELS.SEARCH_SUGGESTIONS, async (_event, { query }: Search
 
 ipcMain.handle(IPC_CHANNELS.GET_HOME_FEED, async (): Promise<SearchResponse> => {
   try {
-    const data = await getHomeFeed()
-    return { ok: true, data }
+    const data = await getHomeDiscovery()
+    return { ok: true, data: data.videos, home: data.home }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -177,6 +189,9 @@ ipcMain.handle(IPC_CHANNELS.CHANNEL_PAGE, async (_event, request: ChannelPageReq
   }
 })
 
+registerUpdates()
+ipcMain.handle(IPC_CHANNELS.APP_PREFERENCES_GET, () => getAppPreferences())
+ipcMain.handle(IPC_CHANNELS.APP_PREFERENCES_SET, (_event, preferences: import('../shared/locale').AppPreferences) => setAppPreferences(preferences))
 ipcMain.handle(IPC_CHANNELS.SESSION_GET_STATE, (): Promise<LocalSessionState> => getSessionState())
 ipcMain.handle(IPC_CHANNELS.PLAYER_AUDIO_GET, () => getPlayerAudioPreferences())
 ipcMain.handle(IPC_CHANNELS.PLAYER_AUDIO_SET, (_event, audio: import('../shared/ipc').PlayerAudioPreferences) => setPlayerAudioPreferences(audio))
@@ -188,7 +203,7 @@ ipcMain.handle(IPC_CHANNELS.SESSION_DELETE_USER, (_event, request: DeleteLocalUs
 ipcMain.handle(IPC_CHANNELS.DATA_EXPORT, async (event): Promise<string | null> => {
   const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
   const result = await dialog.showSaveDialog(ownerWindow, {
-    title: 'Exportar datos de WorldTube',
+    title: translateFor((await getAppPreferences()).language, 'Exportar datos de WorldTube'),
     defaultPath: 'worldtube-data.json',
     filters: [{ name: 'WorldTube data', extensions: ['json'] }]
   })
@@ -200,7 +215,7 @@ ipcMain.handle(IPC_CHANNELS.DATA_EXPORT, async (event): Promise<string | null> =
 ipcMain.handle(IPC_CHANNELS.DATA_IMPORT, async (event): Promise<LocalSessionState | null> => {
   const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
   const result = await dialog.showOpenDialog(ownerWindow, {
-    title: 'Importar datos de WorldTube',
+    title: translateFor((await getAppPreferences()).language, 'Importar datos de WorldTube'),
     properties: ['openFile'],
     filters: [{ name: 'WorldTube data', extensions: ['json'] }]
   })
@@ -242,7 +257,11 @@ ipcMain.handle(IPC_CHANNELS.SUBSCRIPTIONS_ADD, (_event, sub: Omit<Subscription, 
 ipcMain.handle(IPC_CHANNELS.SUBSCRIPTIONS_REMOVE, (_event, channelId: string) => removeSubscription(channelId))
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon(app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'resources/icon.png'))
+  }
   createWindow()
+  void checkForUpdatesOnStartup()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

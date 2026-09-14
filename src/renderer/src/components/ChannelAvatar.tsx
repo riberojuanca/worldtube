@@ -4,6 +4,17 @@ interface ChannelAvatarProps {
   name: string
   thumbnailUrl: string | null
   className?: string
+  imageSize?: number
+}
+
+function sizedAvatarUrl(source: string | null, size?: number): string | null {
+  if (!source || !size) return source
+  try {
+    const url = new URL(source)
+    if (url.protocol !== 'https:' || !['yt3.ggpht.com', 'yt3.googleusercontent.com'].includes(url.hostname)) return source
+    url.pathname = url.pathname.replace(/=s\d+(?=-|$)/, `=s${size}`)
+    return url.href
+  } catch { return source }
 }
 
 function initials(name: string): string {
@@ -15,21 +26,25 @@ function initials(name: string): string {
     .join('') || 'WT'
 }
 
-export function ChannelAvatar({ name, thumbnailUrl, className = 'h-8 w-8' }: ChannelAvatarProps) {
-  const [hasFailed, setHasFailed] = useState(false)
+export function ChannelAvatar({ name, thumbnailUrl, className = 'h-8 w-8', imageSize }: ChannelAvatarProps) {
+  const preferredUrl = sizedAvatarUrl(thumbnailUrl, imageSize)
+  const [failedUrls, setFailedUrls] = useState<string[]>([])
 
   useEffect(() => {
-    setHasFailed(false)
-  }, [thumbnailUrl])
+    setFailedUrls([])
+  }, [thumbnailUrl, imageSize])
 
-  if (thumbnailUrl && !hasFailed) {
+  const currentUrl = [preferredUrl, thumbnailUrl].find((url) => url && !failedUrls.includes(url))
+
+  if (currentUrl) {
     return (
       <img
-        src={thumbnailUrl}
+        src={currentUrl}
         alt=""
         className={`${className} shrink-0 rounded-full bg-neutral-800 object-cover`}
         loading="lazy"
-        onError={() => setHasFailed(true)}
+        decoding="async"
+        onError={() => setFailedUrls((urls) => [...urls, currentUrl])}
       />
     )
   }
