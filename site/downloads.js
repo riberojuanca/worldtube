@@ -19,17 +19,6 @@ copyButton.addEventListener('click', async () => {
   }
 })
 
-const linuxMenu = document.querySelector('.linux-downloads')
-document.addEventListener('pointerdown', (event) => {
-  if (!linuxMenu.contains(event.target)) linuxMenu.open = false
-})
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && linuxMenu.open) {
-    linuxMenu.open = false
-    linuxMenu.querySelector('summary').focus()
-  }
-})
-
 function assetFor(assets, platform) {
   const available = assets.filter((asset) => asset.state === 'uploaded' && asset.size > 0)
   if (platform === 'windows') return available.find((asset) => /\.exe$/i.test(asset.name) && !/arm64|ia32/i.test(asset.name))
