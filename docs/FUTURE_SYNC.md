@@ -3,6 +3,11 @@
 Status: idea recorded on 2026-09-14. Not implemented or committed as a release
 requirement. Preserve WorldTube's standalone local mode.
 
+Public communication should describe this as WorldTube's longer-term direction:
+an optional self-hosted server and future mobile client that can synchronize
+profiles and libraries. Do not present it as an existing service, and do not
+use another project's name as a comparison or imply compatibility with it.
+
 ## Desired Experience
 
 - An optional WorldTube server installed on a home machine or VPS, with a
