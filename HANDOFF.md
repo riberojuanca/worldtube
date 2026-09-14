@@ -1,5 +1,31 @@
 # WorldTube: Current Implementation
 
+## Latest Follow-Up: Previews and Loading
+
+- Video tiles preview after 500ms of mouse hover using native animated images
+  where available, or a metadata-only storyboard frame sequence otherwise.
+  No full video stream, playback token or viewing history entry is created.
+- Requests are serialized, deduplicated, capped and cached. Hover exit, clicks,
+  tab changes, window blur/resize and document visibility changes stop animation.
+  Touch, portrait tiles, playlist covers and reduced-motion users remain static.
+- Largest storyboard frame area is selected. The enlargement cutoff was removed
+  after it suppressed the featured Home preview. Source pixel resolution still
+  limits quality; these previews are not HD video playback.
+- Home's featured tile retains 16:9, with a wider desktop column and smaller
+  adjacent tiles. Fixed-height metadata footers account for both rows' height
+  without stretching the featured image. Mobile stays in the ordinary layout.
+- Circular Shaka loaders use the existing logo in grayscale with a gentle
+  2.6-second opacity pulse, static under reduced-motion preference. Initial
+  loading shows only that logo until manifest loading/autoplay settles, avoiding
+  the premature Play button. Later buffering keeps Shaka's buffering state.
+- Owner reported these latest adjustments working. No production build,
+  typecheck, automated runtime suite or cross-platform installer test was run.
+  Development restarts loaded main/preload changes; renderer changes used HMR.
+- No FreeTube application source was used as a template for this follow-up;
+  this does not certify historical provenance. Distribution approval stays off.
+- Release closure is separate from additional UI features: see
+  [release checklist](docs/RELEASE_CHECKLIST.md). No push or release performed.
+
 ## Latest Session: Discovery, Library and Playback
 
 - Home now combines a featured video area, related live streams, channel

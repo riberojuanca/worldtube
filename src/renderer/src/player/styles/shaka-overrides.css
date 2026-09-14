@@ -16,6 +16,70 @@
   --shaka-rate-preset-border: var(--wt-accent-text);
 }
 
+/* Keep Shaka's buffering state, replace only its circular artwork. */
+.shaka-spinner > svg {
+  display: none !important;
+}
+
+.wt-initial-loader,
+.shaka-spinner::after,
+.shaka-play-button:has(.shaka-ui-icon[viewBox='0 0 38 38'])::after {
+  content: '';
+  display: block;
+  background: url('../../../../../resources/icon.svg') center / 96px 96px no-repeat;
+  filter: grayscale(1) brightness(2.8);
+  animation: wt-loader-glow 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.wt-initial-loader,
+.shaka-spinner::after {
+  width: 96px;
+  height: 40px;
+}
+
+.wt-initial-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.wt-player-loading .shaka-controls-container,
+.wt-player-loading .shaka-spinner-container {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.shaka-play-button:has(.shaka-ui-icon[viewBox='0 0 38 38']) {
+  position: relative;
+}
+
+.shaka-play-button .shaka-ui-icon[viewBox='0 0 38 38'] {
+  visibility: hidden;
+}
+
+.shaka-play-button:has(.shaka-ui-icon[viewBox='0 0 38 38'])::after {
+  position: absolute;
+  inset: 0;
+  background-size: 100% auto;
+}
+
+@keyframes wt-loader-glow {
+  0%, 100% { opacity: .5; }
+  50% { opacity: .95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wt-initial-loader,
+  .shaka-spinner::after,
+  .shaka-play-button:has(.shaka-ui-icon[viewBox='0 0 38 38'])::after {
+    animation: none;
+    opacity: .8;
+  }
+}
+
 .shaka-video-container,
 .shaka-video-container *,
 .shaka-video-container *::before,

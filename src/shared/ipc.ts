@@ -8,6 +8,7 @@ export const IPC_CHANNELS = {
   UPDATES_DOWNLOAD: 'updates:download',
   UPDATES_INSTALL: 'updates:install',
   GET_VIDEO_INFO: 'youtube:get-video-info',
+  GET_VIDEO_PREVIEW: 'youtube:get-video-preview',
   SEARCH: 'youtube:search',
   SEARCH_SUGGESTIONS: 'youtube:search-suggestions',
   GET_CHANNEL: 'youtube:get-channel',
@@ -194,6 +195,14 @@ export interface SearchResultItem {
   durationText: string | null
   viewCountText: string | null
   publishedText: string | null
+  previewUrl?: string | null
+}
+
+export interface VideoPreview {
+  imageUrl: string
+  columns: number
+  rows: number
+  frameCount: number
 }
 
 export interface PlayerAudioPreferences {

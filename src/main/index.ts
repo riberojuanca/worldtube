@@ -21,7 +21,7 @@ import type {
   VideoInfoRequest,
   VideoInfoResponse
 } from '../shared/ipc'
-import { fetchVideoInfo, getChannelInfo, getHomeDiscovery, getSearchSuggestions, getSubscriptionsFeed, searchVideos } from './youtube'
+import { fetchVideoInfo, getChannelInfo, getHomeDiscovery, getSearchSuggestions, getSubscriptionsFeed, getVideoPreview, searchVideos } from './youtube'
 import { getChannelPage } from './channelBrowse'
 import type { ChannelPageRequest, ChannelPageResponse } from '../shared/ipc'
 import { clearHistory, getHistory } from './historyStore'
@@ -141,6 +141,8 @@ ipcMain.handle(
     }
   }
 )
+
+ipcMain.handle(IPC_CHANNELS.GET_VIDEO_PREVIEW, (_event, videoId: string) => getVideoPreview(videoId))
 
 ipcMain.handle(IPC_CHANNELS.SEARCH, async (_event, { query }: SearchRequest): Promise<SearchResponse> => {
   try {

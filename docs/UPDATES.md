@@ -1,5 +1,7 @@
 # Packaging and Updates
 
+Remaining closure tasks and owner decisions: [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+
 ## Current Implementation
 
 - GitHub repository: https://github.com/riberojuanca/worldtube

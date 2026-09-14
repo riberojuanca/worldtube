@@ -114,7 +114,7 @@ function RelatedVideoRow({ video }: { video: SearchResultItem }) {
     <article className="group grid grid-cols-[150px_minmax(0,1fr)] gap-2 rounded p-1 transition-colors hover:bg-neutral-900 max-[480px]:grid-cols-[132px_minmax(0,1fr)]">
       <div className="relative aspect-video rounded bg-neutral-900">
         <Link to={`/watch/${video.videoId}`} className="block h-full w-full overflow-hidden rounded" aria-label={video.title}>
-          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} />
+          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} previewUrl={video.previewUrl} allowPreview />
           {video.durationText && (
             <span className="absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 text-[11px] font-medium leading-none text-white">
               {video.durationText}
@@ -384,7 +384,7 @@ export function Watch() {
               aria-current={item.videoId === videoId ? 'true' : undefined}
               className={`grid grid-cols-[20px_96px_minmax(0,1fr)] items-center gap-2 px-2 py-2 hover:bg-neutral-800 ${item.videoId === videoId ? 'bg-neutral-800' : ''}`}>
               <span className={`text-center text-xs ${item.videoId === videoId ? 'wt-accent-text' : 'text-neutral-500'}`}>{item.videoId === videoId ? '>' : index + 1}</span>
-              <div className="aspect-video overflow-hidden rounded"><VideoThumbnail videoId={item.videoId} thumbnailUrl={item.thumbnailUrl} title={item.title} /></div>
+              <div className="aspect-video overflow-hidden rounded"><VideoThumbnail videoId={item.videoId} thumbnailUrl={item.thumbnailUrl} title={item.title} allowPreview /></div>
               <div className="min-w-0"><h3 className="line-clamp-2 break-words text-sm font-medium text-neutral-100">{item.title}</h3><p className="mt-1 truncate text-xs text-neutral-400">{item.channelName}</p></div>
             </Link>)}
             {!playlistVideos.length && <p className="p-3 text-sm text-neutral-400">{t('This playlist is empty')}</p>}

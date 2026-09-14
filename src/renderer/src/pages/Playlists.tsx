@@ -134,7 +134,7 @@ export function Playlists() {
           {selectedVideos.map((video, index) => <div key={video.id} className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 py-3">
             <span className="text-center text-xs text-neutral-500">{index + 1}</span>
             <Link to={`/watch/${video.videoId}?playlist=${encodeURIComponent(selected.id)}`} className="flex min-w-0 items-center gap-3 rounded hover:bg-neutral-900">
-              <div className="aspect-video w-28 shrink-0 overflow-hidden rounded bg-neutral-900 sm:w-40"><VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} /></div>
+              <div className="aspect-video w-28 shrink-0 overflow-hidden rounded bg-neutral-900 sm:w-40"><VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} allowPreview /></div>
               <div className="min-w-0"><p className="line-clamp-2 break-words text-sm font-medium">{video.title}</p><p className="mt-1 truncate text-xs text-neutral-400">{video.channelName}</p></div>
             </Link>
             <button type="button" disabled={busy} onClick={() => void removeVideo(video)} title={t('Remove from playlist')} className="cursor-pointer rounded px-2 py-2 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-white disabled:opacity-50">{t('Remove')}</button>

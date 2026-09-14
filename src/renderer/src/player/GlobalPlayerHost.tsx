@@ -116,6 +116,9 @@ export function GlobalPlayerHost() {
   // from the user's side the video area just stayed black forever with zero
   // feedback. Surfaced here instead.
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [readySource, setReadySource] = useState<{ videoId: typeof videoId; dashManifest: typeof dashManifest; sabr: typeof sabr } | null>(null)
+  const sourceReady = readySource?.videoId === videoId && readySource?.dashManifest === dashManifest && readySource?.sabr === sabr
+  const isInitialLoading = !loadError && (status === 'loading' || (status === 'ready' && !sourceReady))
 
   // Set right before a SABR-triggered reload calls playVideo() again, so the
   // load effect below can restore the playback position once the new
@@ -357,6 +360,15 @@ export function GlobalPlayerHost() {
     sabrSessionRef.current?.dispose()
     sabrSessionRef.current = null
     setLoadError(null)
+    setReadySource(null)
+
+    const finishLoading = async () => {
+      if (cancelled) return
+      if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) {
+        await videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
+      }
+      if (!cancelled) setReadySource({ videoId, dashManifest, sabr })
+    }
 
     // Timing instrumentation only — measures perceived load time (manifest
     // parsed vs. actual first frame) to find where load time actually goes.
@@ -392,7 +404,7 @@ export function GlobalPlayerHost() {
           loadedVideoRef.current = videoId
           console.log(`[timing] shaka load() (sabr) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
           void loadThumbnailsTrack(player, storyboardVtt)
-          if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) void videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
+          void finishLoading()
           const pending = pendingResumeRef.current
           if (!pending || pending.videoId !== videoId) return
           pendingResumeRef.current = null
@@ -431,7 +443,7 @@ export function GlobalPlayerHost() {
         loadedVideoRef.current = videoId
         console.log(`[timing] shaka load() (dash) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
         void loadThumbnailsTrack(player, storyboardVtt)
-        if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) void videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
+        void finishLoading()
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -571,7 +583,7 @@ export function GlobalPlayerHost() {
         // (it only sets a data-attribute marker on this element) — controls.css scopes
         // every layout/positioning rule for the control bar under this class, so without
         // it shaka's injected buttons/seek bar render completely unstyled.
-        <div ref={setContainerEl} className="shaka-video-container relative h-full w-full overflow-hidden bg-black">
+        <div ref={setContainerEl} className={`shaka-video-container relative h-full w-full overflow-hidden bg-black ${isInitialLoading ? 'wt-player-loading' : ''}`}>
           <video ref={setVideoRef} className="h-full w-full" title={title} crossOrigin="anonymous" playsInline preload="auto">
             {captions.map((track) => (
               <track
@@ -587,6 +599,7 @@ export function GlobalPlayerHost() {
               />
             ))}
           </video>
+          {isInitialLoading && <div className="wt-initial-loader" role="status" aria-label={t('Cargando…')} />}
           {loadError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4 text-center text-white">
               <p className="text-sm">{loadError}</p>

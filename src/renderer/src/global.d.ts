@@ -25,6 +25,7 @@ import type {
 declare global {
   interface Window {
     api: {
+      getVideoPreview: (videoId: string) => Promise<import('../../shared/ipc').VideoPreview | null>
       getAppPreferences: () => Promise<import('../../shared/locale').AppPreferences>
       setAppPreferences: (preferences: import('../../shared/locale').AppPreferences) => Promise<void>
       getUpdateState: () => Promise<import('../../shared/ipc').UpdateState>

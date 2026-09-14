@@ -46,7 +46,57 @@ inter-item gaps. It retains horizontal native scrolling and shows previous/next
 buttons only where there is more content. ResizeObserver recalculates slots and
 overflow after window size changes; image dimensions have responsive limits.
 
-## Search
+## Hover Previews
+
+Video tiles start an image preview after 500ms of mouse hover. Parsed animated
+thumbnail overlays/MovingThumbnail images are used when present. Otherwise a
+dedicated metadata-only IPC request obtains a storyboard sprite sheet; up to
+24 frames near the middle of the video cycle every 400ms. This fallback is a
+frame sequence, not full video playback. Missing/failed previews leave the
+ordinary thumbnail unchanged. No stream, playback token or history entry is
+created by the preview path.
+
+Storyboard selection uses the largest per-frame pixel area. An initial 1.4x
+enlargement guard was removed because it suppressed previews on the featured
+tile. Available previews now display at the tile size; source resolution can
+still limit sharpness, especially on the large tile. Missing/failed preview
+artwork still leaves the static image. This is not an HD video stream.
+
+Metadata requests are serialized, deduplicated per video and capped at eight
+pending requests. Up to 64 results are cached for ten minutes (missing previews
+for two minutes). Leaving hover/unmounting removes the preview, timers and image
+handlers; an already started metadata request can finish and populate the cache.
+Previews stop on tab changes, document visibility changes, window blur, resize
+and clicks.
+Touch, portrait cards and reduced-motion users retain static thumbnails.
+Playlist covers and Shorts modal placeholders remain static as well.
+
+The featured Home tile retains 16:9 instead of stretching/cropping to match the
+adjacent two rows. Desktop allocates additional width to the featured tile and
+less to the four smaller ones, accounting for uniform 80px metadata footers and
+grid gaps. Other tiles keep their regular metadata layout; mobile keeps 16:9.
+
+## Buffering Artwork
+
+Shaka circular spinners, including its buffering play-button icon, use the
+existing WorldTube icon without text in grayscale. CSS overrides hide only
+the original buffering artwork; Shaka still controls buffering visibility.
+A 2.6-second opacity pulse replaces rotation, with no scaling or flashing.
+Reduced-motion preference disables the pulse. Upstream library files/notices
+are not modified. Page skeletons and text loading states are unchanged.
+
+Initial metadata/player loading hides Shaka controls and its own spinner,
+showing a single WorldTube logo. Controls return after the manifest loads and
+the autoplay attempt settles; a rejected autoplay attempt leaves Play available
+instead of blocking the user. Ready state is associated with the video/manifest
+source and late callbacks from a replaced load cannot reveal stale controls.
+
+Sources: installed YouTube.js `AnimatedThumbnailOverlayView`, `MovingThumbnail`
+and `PlayerStoryboardSpec` parser contracts; existing WorldTube IPC/tab APIs.
+No FreeTube application source was used as a template for this implementation.
+No production build, typecheck or automated tests were run.
+
+## Search Results
 
 Search is no longer restricted to videos. Mixed YouTube results include
 channels, with a channel-filtered fallback request if the mixed page has none.

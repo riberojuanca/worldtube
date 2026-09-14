@@ -71,9 +71,11 @@ export function Home() {
       {feedStatus === 'ready' && <div className="space-y-8">
         {feed[0] && <section>
           <h2 className="mb-3 text-lg font-semibold">{t('For you')}</h2>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="min-w-0">{videoTile(feed[0])}</div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{feed.slice(1, 5).map(videoTile)}</div>
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,calc(50%+80px))_minmax(0,1fr)]">
+            <div className="min-w-0"><VideoCard {...feed[0]} featured alignedFooter badge={feed[0].durationText}
+              meta={[feed[0].viewCountText, feed[0].publishedText].filter(Boolean).join(' · ')} /></div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{feed.slice(1, 5).map((video) => <VideoCard key={video.videoId} {...video} alignedFooter badge={video.durationText}
+              meta={[video.viewCountText, video.publishedText].filter(Boolean).join(' · ')} />)}</div>
           </div>
         </section>}
         {discovery && <section className="border-t border-neutral-800 pt-6">

@@ -5,7 +5,7 @@ import { evaluatePlayerScript } from './jsEvaluator'
 import { getHistory, recordHistoryEntry } from './historyStore'
 import { getAppLanguage, listActiveSubscriptions } from './localDb'
 import { translateFor } from '../shared/locale'
-import type { CaptionTrack, ChannelInfoResult, HomeDiscovery, HomeSection, RecommendedChannel, SearchResultItem, VideoInfoResult } from '../shared/ipc'
+import type { CaptionTrack, ChannelInfoResult, HomeDiscovery, HomeSection, RecommendedChannel, SearchResultItem, VideoInfoResult, VideoPreview } from '../shared/ipc'
 
 type VideoOrGridVideo =
   | InstanceType<typeof YTNodes.Video>
@@ -64,6 +64,11 @@ function getLockupPrimaryThumbnail(lockup: LockupView): ThumbnailViewLike | null
 
 export function getLockupThumbnailUrl(lockup: LockupView): string | null {
   return getLockupPrimaryThumbnail(lockup)?.image?.[0]?.url ?? null
+}
+
+function getLockupPreviewUrl(lockup: LockupView): string | null {
+  const overlay = getLockupPrimaryThumbnail(lockup)?.overlays?.find((item) => item instanceof YTNodes.AnimatedThumbnailOverlayView)
+  return overlay instanceof YTNodes.AnimatedThumbnailOverlayView ? overlay.thumbnail[0]?.url ?? null : null
 }
 
 function getLockupDurationText(lockup: LockupView): string | null {
@@ -150,6 +155,7 @@ function mapLockupView(lockup: LockupView, fallbackChannelId: string | null = nu
     channelId: getLockupChannelId(lockup, fallbackChannelId),
     channelName: getLockupChannelName(lockup, fallbackChannelName),
     thumbnailUrl: getLockupThumbnailUrl(lockup),
+    previewUrl: getLockupPreviewUrl(lockup),
     durationText: getLockupDurationText(lockup),
     viewCountText: null,
     publishedText: getLockupPublishedText(lockup)
@@ -185,7 +191,9 @@ function mapVideoNodes(
         (isCompactMovie ? null : video.short_view_count?.toString()) ??
         (isGridVideo ? video.views?.toString() : isCompactMovie ? null : video.view_count?.toString()) ??
         null,
-      publishedText: (isCompactMovie ? null : video.published?.toString()) ?? null
+      publishedText: (isCompactMovie ? null : video.published?.toString()) ?? null,
+      previewUrl: video instanceof YTNodes.Video || video instanceof YTNodes.CompactVideo
+        ? getMovingThumbnailUrl(video.rich_thumbnail) : null
     }
   })
 }
@@ -219,6 +227,51 @@ export function mapSearchResultNodes(
 
 function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
   return mapSearchResultNodes(nodes)
+}
+
+function getMovingThumbnailUrl(value: unknown): string | null {
+  // MovingThumbnail's parser returns the thumbnail array directly.
+  if (!Array.isArray(value)) return null
+  const image = value[0] as { url?: unknown } | undefined
+  return typeof image?.url === 'string' ? image.url : null
+}
+
+const previewCache = new Map<string, { value: VideoPreview | null; expires: number }>()
+const previewRequests = new Map<string, Promise<VideoPreview | null>>()
+let previewQueue: Promise<unknown> = Promise.resolve()
+
+export function getVideoPreview(videoId: string): Promise<VideoPreview | null> {
+  if (typeof videoId !== 'string' || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) return Promise.resolve(null)
+  const cached = previewCache.get(videoId)
+  if (cached && cached.expires > Date.now()) return Promise.resolve(cached.value)
+  const pending = previewRequests.get(videoId)
+  if (pending) return pending
+  if (previewRequests.size >= 8) return Promise.resolve(null)
+  const request = previewQueue.then(async (): Promise<VideoPreview | null> => {
+    try {
+      const yt = await getClient()
+      const info = await yt.getInfo(videoId)
+      const boards = info.storyboards instanceof YTNodes.PlayerStoryboardSpec ? info.storyboards.boards : []
+      const board = boards.reduce<(typeof boards)[number] | null>((best, item) =>
+        !best || item.thumbnail_width * item.thumbnail_height > best.thumbnail_width * best.thumbnail_height ? item : best, null)
+      if (!board || ![board.columns, board.rows, board.thumbnail_count].every((value) => Number.isSafeInteger(value) && value > 0)) return null
+      const capacity = board.columns * board.rows
+      const sheet = Math.floor(Math.floor(board.thumbnail_count / 2) / capacity)
+      const imageUrl = board.template_url.replaceAll('$M', String(sheet))
+      const url = new URL(imageUrl)
+      if (url.protocol !== 'https:' || !url.hostname.endsWith('.ytimg.com')) return null
+      return { imageUrl, columns: board.columns, rows: board.rows,
+        frameCount: Math.min(24, capacity, board.thumbnail_count - sheet * capacity) }
+    } catch { return null }
+  }).then((value) => {
+    previewCache.delete(videoId)
+    previewCache.set(videoId, { value, expires: Date.now() + (value ? 600_000 : 120_000) })
+    if (previewCache.size > 64) previewCache.delete(previewCache.keys().next().value!)
+    return value
+  }).finally(() => previewRequests.delete(videoId))
+  previewRequests.set(videoId, request)
+  previewQueue = request.catch(() => null)
+  return request
 }
 
 async function resolveChannelNames(videos: SearchResultItem[]): Promise<SearchResultItem[]> {

@@ -29,6 +29,7 @@ import type {
 } from '../shared/ipc'
 
 const api = {
+  getVideoPreview: (videoId: string): Promise<import('../shared/ipc').VideoPreview | null> => ipcRenderer.invoke(IPC_CHANNELS.GET_VIDEO_PREVIEW, videoId),
   getAppPreferences: (): Promise<AppPreferences> => ipcRenderer.invoke(IPC_CHANNELS.APP_PREFERENCES_GET),
   setAppPreferences: (preferences: AppPreferences): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_PREFERENCES_SET, preferences),
   getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATES_STATE),

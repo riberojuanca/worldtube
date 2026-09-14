@@ -76,6 +76,7 @@ export function Search() {
           channelId={video.channelId}
           channelName={video.channelName}
           thumbnailUrl={video.thumbnailUrl}
+          previewUrl={video.previewUrl}
           badge={video.durationText}
           meta={[video.viewCountText, video.publishedText].filter(Boolean).join(' · ')}
         />
