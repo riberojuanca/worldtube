@@ -2,6 +2,16 @@
 
 ## Delivery Closure: 2026-09-14
 
+- Linux AppImage and DEB generation succeeded locally after exposing Corepack's
+  pnpm shim to Builder. No second application compilation was needed. Packaged
+  resources include the BotGuard bundle/preload, native esbuild, full notices
+  and WorldTube's AGPL/COPYRIGHT files.
+- Source commit 1b3fe12 and tag v0.0.1 were pushed. First Pages attempt failed
+  before repository Pages setup; owner selected GitHub Actions as the source.
+  First release CI failed on Linux packaging and Windows Corepack installation;
+  do not describe the draft as published. Download buttons remain unavailable
+  until real public release assets exist.
+
 - Owner selected AGPL-3.0-only, requested no further feature work and authorized
   repository, Pages and installer publication. LICENSE/COPYRIGHT.txt are added
   to installer resources. Concrete technical review is complete in

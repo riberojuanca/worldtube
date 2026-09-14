@@ -32,8 +32,6 @@ jobs:
         with:
           node-version: '24'
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - run: node scripts/prepare-site.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
