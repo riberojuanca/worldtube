@@ -24,7 +24,8 @@ export interface GlobalPlayerState {
   error: string | null
 }
 
-interface GlobalPlayerContextValue extends GlobalPlayerState {
+export interface GlobalPlayerContextValue extends GlobalPlayerState {
+  ownerTabId: string
   playVideo: (videoId: string) => Promise<void>
   closePlayer: () => void
   shorts: SearchResultItem[]
@@ -32,7 +33,7 @@ interface GlobalPlayerContextValue extends GlobalPlayerState {
   dismissShorts: () => void
 }
 
-const initialState: GlobalPlayerState = {
+export const initialState: GlobalPlayerState = {
   videoId: null,
   title: '',
   channelId: null,
@@ -55,9 +56,9 @@ const initialState: GlobalPlayerState = {
   error: null
 }
 
-const GlobalPlayerContext = createContext<GlobalPlayerContextValue | null>(null)
+export const GlobalPlayerContext = createContext<GlobalPlayerContextValue | null>(null)
 
-export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
+export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { children: ReactNode; tabId?: string; onOpenShort?: () => void }) {
   const [state, setState] = useState<GlobalPlayerState>(initialState)
   const [shorts, setShorts] = useState<SearchResultItem[]>([])
 
@@ -156,15 +157,16 @@ export function GlobalPlayerProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const openShort = useCallback((videoId: string, videos: SearchResultItem[]) => {
+    if (state.videoId !== videoId) onOpenShort?.()
     setShorts(videos)
     if (state.videoId !== videoId) void playVideo(videoId)
-  }, [state.videoId, playVideo])
+  }, [state.videoId, playVideo, onOpenShort])
 
   const dismissShorts = useCallback(() => setShorts([]), [])
 
   const value = useMemo<GlobalPlayerContextValue>(
-    () => ({ ...state, playVideo, closePlayer, shorts, openShort, dismissShorts }),
-    [state, playVideo, closePlayer, shorts, openShort, dismissShorts]
+    () => ({ ...state, ownerTabId: tabId, playVideo, closePlayer, shorts, openShort, dismissShorts }),
+    [state, tabId, playVideo, closePlayer, shorts, openShort, dismissShorts]
   )
 
   return <GlobalPlayerContext.Provider value={value}>{children}</GlobalPlayerContext.Provider>

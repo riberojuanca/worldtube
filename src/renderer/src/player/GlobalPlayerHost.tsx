@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAppTabs, usePageTab } from '../tabs/AppTabs'
+import { usePlayerWorkspace } from './PlayerWorkspace'
 // The ui build, not the core-only 'shaka-player' entry point — this file
 // creates the shaka.ui.Overlay control bar (shaka-player's own official UI,
 // the same one FreeTube uses over its shaka.Player — see its
@@ -54,8 +56,8 @@ export const MINI_SLOT_ID = 'global-player-mini-slot'
 export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
 
 /**
- * Mounted ONCE, in App.tsx. One <video>, one shaka.Player, for the whole
- * app's life — switching videos calls `player.load()` again rather than
+ * One persistent <video> and shaka.Player per tab. Switching videos inside
+ * that tab calls `player.load()` again rather than
  * recreating anything, so there's no equivalent here of the bug we hit (and
  * fixed) in the freetube-audio-lab prototype, where swapping a Vue `:key`
  * unmounted the old Shaka instance without awaiting its async destroy: this
@@ -68,9 +70,19 @@ export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
  * the element (and the shaka.Player attached to it) never unmounts.
  */
 export function GlobalPlayerHost() {
-  const { videoId, dashManifest, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status } = useGlobalPlayer()
+  const { videoId, dashManifest, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
   const location = useLocation()
-  const isWatchRoute = location.pathname.startsWith('/watch/')
+  const navigate = useNavigate()
+  const { activeId: activeTabId } = useAppTabs()
+  const { id: tabId, active: isTabActive } = usePageTab()
+  const { ownerId, shouldAutoplay } = usePlayerWorkspace()
+  const watchSlotId = `${WATCH_SLOT_ID}-${tabId}`
+  const miniSlotId = `${MINI_SLOT_ID}-${tabId}`
+  const shortsSlotId = `${SHORTS_SLOT_ID}-${tabId}`
+  const isWatchRoute = isTabActive && location.pathname === `/watch/${videoId}`
+  const autoplayAllowedRef = useRef(true)
+  const positionsRef = useRef(new Map<string, number>())
+  const loadedVideoRef = useRef<string | null>(null)
 
   const hiddenHomeRef = useRef<HTMLDivElement | null>(null)
   const playerRef = useRef<shaka.Player | null>(null)
@@ -114,15 +126,15 @@ export function GlobalPlayerHost() {
       movePortalMount(hiddenHomeRef.current)
       return
     }
-    const watchSlot = isWatchRoute ? document.getElementById(WATCH_SLOT_ID) : null
-    const miniSlot = document.getElementById(MINI_SLOT_ID)
-    const shortSlot = shorts.length > 0 ? document.getElementById(SHORTS_SLOT_ID) : null
+    const watchSlot = isWatchRoute ? document.getElementById(watchSlotId) : null
+    const miniSlot = ownerId === tabId ? document.getElementById(miniSlotId) : null
+    const shortSlot = ownerId === tabId && shorts.length > 0 ? document.getElementById(shortsSlotId) : null
     const slot = shortSlot || watchSlot || miniSlot
     console.log(
       `[player-slot] isWatchRoute=${isWatchRoute} watchSlotFound=${Boolean(watchSlot)} miniSlotFound=${Boolean(miniSlot)} -> using ${slot ? (slot.id || 'hidden-home') : 'hidden-home (no slot found!)'}`
     )
     movePortalMount(slot)
-  }, [isWatchRoute, videoId, location.pathname, portalMount, shorts.length])
+  }, [isWatchRoute, videoId, location.pathname, portalMount, shorts.length, activeTabId, ownerId, tabId, watchSlotId, miniSlotId, shortsSlotId])
 
   useEffect(() => {
     return () => portalMount.remove()
@@ -217,10 +229,101 @@ export function GlobalPlayerHost() {
   }, [videoEl])
 
   useEffect(() => {
+    if (!videoEl || !videoId || ownerId !== tabId) return
+    let lastTextTrack: shaka.extern.TextTrack | null = null
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isSpace = event.code === 'Space' || event.key === ' '
+      const key = isSpace ? ' ' : event.key.toLowerCase()
+      const next = key === 'medianexttrack' || (event.shiftKey && key === 'n')
+      const previous = key === 'mediaprevioustrack' || (event.shiftKey && key === 'p')
+      const shortcuts = [' ', 'k', 'j', 'l', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'm', 'f', 'c', 'home', 'end', ',', '.', '<', '>', 'mediaplaypause', 'mediastop']
+      if (!shortcuts.includes(key) && !/^\d$/.test(key) && !next && !previous) return
+      if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.shiftKey && !next && !previous && key !== '<' && key !== '>') return
+      const target = event.target instanceof HTMLElement ? event.target : document.activeElement
+      if (target instanceof HTMLElement) {
+        if (target.isContentEditable || target.closest('input, textarea, select, [role="textbox"], [role="combobox"]')) return
+        if (isSpace && target.closest('button, a[href], [role="button"], [role="checkbox"], [role="switch"], summary')) return
+        const dialog = target.closest('dialog, [role="dialog"]')
+        if (dialog && !dialog.querySelector(`#${shortsSlotId}`)) return
+      }
+      const player = playerRef.current
+      if (!player?.getAssetUri()) return
+      if ((key === ',' || key === '.') && !videoEl.paused) return
+      if (previous && shorts.length === 0) return
+      event.preventDefault()
+      // Shaka also handles playback keys; consume this event before its listener.
+      event.stopImmediatePropagation()
+      if (event.repeat && !['j', 'l', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', ',', '.', '<', '>'].includes(key)) return
+      const send = (detail: PlayerCommandDetail) => window.dispatchEvent(new CustomEvent<PlayerCommandDetail>(PLAYER_COMMAND_EVENT, { detail: { ...detail, tabId } }))
+      const seek = (seconds: number) => {
+        const range = player.seekRange()
+        if (Number.isFinite(seconds)) send({ action: 'seek-to', seconds: Math.max(range.start, Math.min(range.end, seconds)) })
+      }
+      if (next || previous) {
+        if (shorts.length) {
+          const index = shorts.findIndex((short) => short.videoId === videoId)
+          const targetShort = index >= 0 ? shorts[index + (next ? 1 : -1)] : undefined
+          if (targetShort) openShort(targetShort.videoId, shorts)
+        } else if (next && relatedVideos[0]) {
+          if (isWatchRoute) navigate(`/watch/${relatedVideos[0].videoId}`)
+          else void playVideo(relatedVideos[0].videoId)
+        }
+        return
+      }
+      switch (key) {
+        case ' ': case 'k': case 'mediaplaypause': send({ action: 'toggle-play' }); break
+        case 'j': case 'arrowleft': seek(videoEl.currentTime - (key === 'j' ? 10 : 5)); break
+        case 'l': case 'arrowright': seek(videoEl.currentTime + (key === 'l' ? 10 : 5)); break
+        case 'arrowup': case 'arrowdown':
+          send({ action: 'set-volume', volume: Math.min(1, Math.max(0, (videoEl.muted ? 0 : videoEl.volume) + (key === 'arrowup' ? 0.05 : -0.05))) }); break
+        case 'm': videoEl.muted = !videoEl.muted; break
+        case 'f': void uiRef.current?.getControls()?.toggleFullScreen(); break
+        case 'c': {
+          const tracks = player.getTextTracks()
+          const active = tracks.find((track) => track.active)
+          if (tracks.length) {
+            if (active) { lastTextTrack = active; player.selectTextTrack(null) }
+            else player.selectTextTrack(lastTextTrack ?? tracks[0])
+          } else {
+            const nativeTracks = Array.from(videoEl.textTracks).filter((track) => track.kind === 'subtitles' || track.kind === 'captions')
+            const showing = nativeTracks.find((track) => track.mode === 'showing')
+            for (const track of nativeTracks) track.mode = 'disabled'
+            if (!showing && nativeTracks[0]) nativeTracks[0].mode = 'showing'
+          }
+          break
+        }
+        case 'home': seek(player.seekRange().start); break
+        case 'end': seek(Math.max(player.seekRange().start, player.seekRange().end - 0.1)); break
+        case ',': case '.': {
+          const fps = player.getVariantTracks().find((track) => track.active)?.frameRate || 30
+          seek(videoEl.currentTime + (key === '.' ? 1 : -1) / fps)
+          break
+        }
+        case '<': case '>':
+          player.trickPlay(Math.min(2, Math.max(0.25, Math.round((videoEl.playbackRate + (key === '>' ? 0.25 : -0.25)) * 4) / 4)), false); break
+        case 'mediastop': videoEl.pause(); seek(player.seekRange().start); break
+        default: {
+          const range = player.seekRange()
+          seek(range.start + (range.end - range.start) * Number(key) / 10)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [videoEl, videoId, shorts, openShort, relatedVideos, playVideo, isWatchRoute, navigate, ownerId, tabId, shortsSlotId])
+
+  useEffect(() => {
     const player = playerRef.current
     // `videoEl` is only set after `attach(video)` resolves in the FreeTube Lab
     // order above, so reaching this point means Shaka has a media element.
     if (!player || !videoEl) return
+
+    if (loadedVideoRef.current) {
+      positionsRef.current.set(loadedVideoRef.current, videoEl.currentTime)
+      loadedVideoRef.current = null
+    }
+    const resumeAt = videoId ? positionsRef.current.get(videoId) || 0 : 0
 
     // Always tear down the previous video's SABR session (its `sabr:` scheme
     // handler and request state) before starting the next one — leaving it
@@ -249,6 +352,7 @@ export function GlobalPlayerHost() {
           // path yet, so re-run the whole getVideoInfo pipeline — see the
           // `.then()` below for how the playback position survives that.
           if (videoId) {
+            autoplayAllowedRef.current = !player.getMediaElement()?.paused
             pendingResumeRef.current = { videoId, seconds: player.getMediaElement()?.currentTime ?? 0 }
             void playVideo(videoId)
           }
@@ -256,11 +360,13 @@ export function GlobalPlayerHost() {
       })
       sabrSessionRef.current = session
       player
-        .load(session.manifestUri)
+        .load(session.manifestUri, resumeAt)
         .then(() => {
+          if (player.getAssetUri() !== session.manifestUri) return
+          loadedVideoRef.current = videoId
           console.log(`[timing] shaka load() (sabr) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
           void loadThumbnailsTrack(player, storyboardVtt)
-          if (shorts.length > 0) void videoEl.play().catch((error) => console.warn('Short autoplay failed', error))
+          if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) void videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
           const pending = pendingResumeRef.current
           if (!pending || pending.videoId !== videoId) return
           pendingResumeRef.current = null
@@ -286,11 +392,13 @@ export function GlobalPlayerHost() {
 
     const manifestUri = URL.createObjectURL(new Blob([dashManifest], { type: 'application/dash+xml' }))
     player
-      .load(manifestUri)
+      .load(manifestUri, resumeAt)
       .then(() => {
+        if (player.getAssetUri() !== manifestUri) return
+        loadedVideoRef.current = videoId
         console.log(`[timing] shaka load() (dash) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
         void loadThumbnailsTrack(player, storyboardVtt)
-        if (shorts.length > 0) void videoEl.play().catch((error) => console.warn('Short autoplay failed', error))
+        if (autoplayAllowedRef.current && (shouldAutoplay(tabId) || pendingResumeRef.current?.videoId === videoId)) void videoEl.play().catch((error) => console.warn('Video autoplay failed', error))
       })
       .catch((error: unknown) => {
         const description = describeError(error)
@@ -330,6 +438,7 @@ export function GlobalPlayerHost() {
 
     const emitState = () => {
       const detail: PlayerStateDetail = {
+        tabId,
         paused: videoEl.paused,
         currentTime: videoEl.currentTime || 0,
         duration: Number.isFinite(videoEl.duration) ? videoEl.duration : 0,
@@ -339,7 +448,9 @@ export function GlobalPlayerHost() {
     }
 
     const handleSeek = (event: Event) => {
-      const seconds = (event as CustomEvent<{ seconds?: number }>).detail?.seconds
+      const detail = (event as CustomEvent<{ seconds?: number; tabId?: string }>).detail
+      if (detail?.tabId !== tabId) return
+      const seconds = detail.seconds
       if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return
 
       videoEl.currentTime = Math.max(0, seconds)
@@ -349,6 +460,12 @@ export function GlobalPlayerHost() {
     const handleCommand = (event: Event) => {
       const detail = (event as CustomEvent<PlayerCommandDetail>).detail
       if (!detail) return
+      if (detail.action === 'pause-others') {
+        autoplayAllowedRef.current = detail.tabId === tabId
+        if (detail.tabId !== tabId) videoEl.pause()
+        return
+      }
+      if (detail.tabId !== tabId) return
 
       if (detail.action === 'sync') {
         emitState()
@@ -409,7 +526,7 @@ export function GlobalPlayerHost() {
       videoEl.removeEventListener('timeupdate', emitState)
       videoEl.removeEventListener('volumechange', emitState)
     }
-  }, [videoEl])
+  }, [videoEl, tabId])
 
   return (
     <>
@@ -420,7 +537,7 @@ export function GlobalPlayerHost() {
         // every layout/positioning rule for the control bar under this class, so without
         // it shaka's injected buttons/seek bar render completely unstyled.
         <div ref={setContainerEl} className="shaka-video-container relative h-full w-full overflow-hidden bg-black">
-          <video ref={setVideoRef} className="h-full w-full" title={title} autoPlay crossOrigin="anonymous" playsInline preload="auto">
+          <video ref={setVideoRef} className="h-full w-full" title={title} crossOrigin="anonymous" playsInline preload="auto">
             {captions.map((track) => (
               <track
                 // Keyed on videoId too: browsers don't reliably reload a

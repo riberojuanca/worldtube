@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -25,6 +26,9 @@ import { Saved } from './pages/Saved'
 import { Search } from './pages/Search'
 import { Subscriptions } from './pages/Subscriptions'
 import { Watch } from './pages/Watch'
+import { TabBar, TabPages, TabLinkHandler } from './tabs/AppTabs'
+import { useAppTabs, usePageTab } from './tabs/AppTabs'
+import { PlayerWorkspaceProvider, RegisterTabPlayer, usePlayerWorkspace } from './player/PlayerWorkspace'
 import type { SearchHistoryEntry, Subscription, UserProfile } from '../../shared/ipc'
 
 type IconName =
@@ -625,10 +629,6 @@ function formatMediaTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
-function sendPlayerCommand(detail: PlayerCommandDetail) {
-  window.dispatchEvent(new CustomEvent<PlayerCommandDetail>(PLAYER_COMMAND_EVENT, { detail }))
-}
-
 function isMinimizeGesture(event: PointerEvent, drag: { startY: number; offsetY: number; height: number }): boolean {
   const draggedBottom = event.clientY - drag.offsetY + drag.height
   return event.clientY - drag.startY > 28 && draggedBottom >= window.innerHeight - 72
@@ -639,9 +639,15 @@ function isRangeControlTarget(target: EventTarget | null): boolean {
 }
 
 function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
-  const { videoId, title, channelName, closePlayer, shorts } = useGlobalPlayer()
+  const { videoId, title, channelName, closePlayer, shorts, ownerTabId } = useGlobalPlayer()
+  const { activeId, select, navigatorFor, tabs: tabsForMini } = useAppTabs()
+  function returnToWatch() {
+    select(ownerTabId)
+    const owner = tabsForMini.find((tab) => tab.id === ownerTabId)
+    if (owner?.entries[owner.index] !== `/watch/${videoId}`) navigatorFor(ownerTabId).push(`/watch/${videoId}`)
+  }
+  const sendPlayerCommand = (detail: PlayerCommandDetail) => window.dispatchEvent(new CustomEvent<PlayerCommandDetail>(PLAYER_COMMAND_EVENT, { detail: { ...detail, tabId: ownerTabId } }))
   const location = useLocation()
-  const navigate = useNavigate()
   const [isMinimized, setIsMinimized] = useState(false)
   const [isMinimizePreview, setIsMinimizePreview] = useState(false)
   const [isRestorePreview, setIsRestorePreview] = useState(false)
@@ -669,7 +675,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
     moved: boolean
   } | null>(null)
   const lastDragEndAtRef = useRef(Number.NEGATIVE_INFINITY)
-  const isWatchRoute = location.pathname.startsWith('/watch/')
+  const isWatchRoute = activeId === ownerTabId && location.pathname === `/watch/${videoId}`
 
   useEffect(() => {
     setIsMinimized(false)
@@ -690,13 +696,14 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
 
   useEffect(() => {
     const handlePlayerState = (event: Event) => {
-      setPlayerState((event as CustomEvent<PlayerStateDetail>).detail)
+      const detail = (event as CustomEvent<PlayerStateDetail>).detail
+      if (detail.tabId === ownerTabId) setPlayerState(detail)
     }
 
     window.addEventListener(PLAYER_STATE_EVENT, handlePlayerState)
     sendPlayerCommand({ action: 'sync' })
     return () => window.removeEventListener(PLAYER_STATE_EVENT, handlePlayerState)
-  }, [videoId])
+  }, [videoId, ownerTabId])
 
   function handleDraggedClickCapture(event: ReactMouseEvent<HTMLElement>) {
     if (performance.now() - lastDragEndAtRef.current > 250) return
@@ -905,7 +912,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
         <div className="grid min-h-[58px] min-w-0 grid-cols-[minmax(120px,1fr)_minmax(220px,520px)_auto] items-center gap-4 px-4 max-[840px]:grid-cols-[minmax(0,1fr)_auto]">
           <button
             type="button"
-            onClick={() => navigate(`/watch/${videoId}`)}
+            onClick={returnToWatch}
             className="min-w-0 cursor-pointer text-left"
             data-player-control="true"
           >
@@ -1026,7 +1033,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
         >
           <button
             type="button"
-            onClick={() => navigate(`/watch/${videoId}`)}
+            onClick={returnToWatch}
             className="min-w-0 cursor-pointer px-3 py-2 text-left"
             data-player-control="true"
           >
@@ -1060,7 +1067,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
               <Icon name="x" className="h-4 w-4" />
             </button>
           </div>
-          <div id={MINI_SLOT_ID} className="col-span-2 aspect-video w-full bg-black" />
+          <div id={`${MINI_SLOT_ID}-${ownerTabId}`} className="col-span-2 aspect-video w-full bg-black" />
         </aside>
       </div>
     </>
@@ -1092,20 +1099,41 @@ export default function App() {
 
   return (
     <ProfileProvider>
-      <GlobalPlayerProvider>
-        <div className="min-h-screen bg-neutral-950 text-neutral-100">
+      <PlayerWorkspaceProvider>
+        <TabLinkHandler><div className="min-h-screen bg-neutral-950 text-neutral-100">
           <TopNav isSideNavOpen={isSideNavOpen} onToggleSideNav={() => setIsSideNavOpen((value) => !value)} />
           <div className="flex min-h-[calc(100vh-60px)] max-[680px]:block max-[680px]:pb-[72px] max-[680px]:pt-[60px]">
             <SideNav isOpen={isSideNavOpen} />
-            <main className="min-w-0 flex-1 p-4 max-[680px]:p-3">
-              <AppRoutes />
+            <main className="min-w-0 flex-1">
+              <PlayerTabBar />
+              <div className="p-4 max-[680px]:p-3"><TabPages><TabPlayer /></TabPages></div>
             </main>
           </div>
-          <GlobalPlayerHost />
           <MiniPlayer isSideNavOpen={isSideNavOpen} />
           <ShortsModal />
-        </div>
-      </GlobalPlayerProvider>
+        </div></TabLinkHandler>
+      </PlayerWorkspaceProvider>
     </ProfileProvider>
   )
+}
+
+function PlayerTabBar() {
+  const { playingIds } = usePlayerWorkspace()
+  return <TabBar playingIds={playingIds} />
+}
+
+function TabPlayer() {
+  const { id } = usePageTab()
+  const { requestPlayback } = usePlayerWorkspace()
+  const startShort = useCallback(() => requestPlayback(id), [requestPlayback, id])
+  return <GlobalPlayerProvider tabId={id} onOpenShort={startShort}>
+    <RegisterTabPlayer />
+    <AppRoutes />
+    <TabPlayerMedia />
+  </GlobalPlayerProvider>
+}
+
+function TabPlayerMedia() {
+  const { videoId } = useGlobalPlayer()
+  return videoId ? <GlobalPlayerHost /> : null
 }

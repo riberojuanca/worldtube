@@ -36,8 +36,15 @@ Funciona:
 - Base visual: todos los redondeos van a 3px. La fuente base usa Inter local por defecto, con Inter Tight local disponible para comparar; Roboto no se carga desde la nube.
 - Usuarios/sesión local: usuario local con contraseña opcional, login/logout, perfil activo arriba a la derecha, edición de nombre/foto/color desde ese menú, panel Cuenta para datos locales y export/import completo.
 - Shell Electron con navegación, header, sidebar y mini reproductor flotante arrastrable.
-- Un único player global persistente en `GlobalPlayerHost.tsx`, movido por portal entre
-  `#global-player-watch-slot`, `#global-player-mini-slot` y `#global-player-shorts-slot`.
+- Pestañas internas: crear, cerrar, reordenar, historial y scroll independientes. Ctrl/cmd+clic
+  o clic central abre enlaces en segundo plano; con Shift selecciona la pestaña nueva.
+- Un reproductor persistente por pestaña con video en `GlobalPlayerHost.tsx`; slots Watch,
+  mini y Shorts identificados por pestaña. Las pestañas sin video no crean reproductores.
+  La primera entrada a un video abierto en segundo plano inicia ese video y pausa los demás;
+  después cada pestaña conserva su play/pausa sin recargar. Se permite play simultáneo manual.
+- Mini compartido vinculado a su pestaña de origen: pulsar el título vuelve a esa pestaña,
+  sin reemplazar el contenido de otra. Cerrar una pestaña detiene su reproductor.
+  Detalles y límites en [docs/TABS.md](docs/TABS.md).
 - Mini reproductor: se puede mover, arrastrar hacia abajo para minimizar a barra inferior con
   controles, restaurar con flecha diagonal o arrastrar la barra hacia arriba sin desmontar el
   `<video>`.
@@ -56,6 +63,16 @@ Funciona:
   en SABR/DASH. Volumen horizontal expandible, sin barra flotante, en controles compactos.
 - Búsqueda general con historial por perfil y sugerencias remotas; fallback de miniaturas de
   video y avatares con iniciales cuando la imagen falla.
+- Atajos globales Espacio/K para play-pausa en Watch, mini, barra minimizada y Shorts.
+  Los comandos y estados llevan ID de pestaña; los atajos actúan sobre el reproductor
+  representado en la interfaz, sin controlar todos los videos simultáneamente.
+  Se respetan campos de texto y Espacio sobre botones seleccionados; una pulsación no dispara
+  dos toggles aunque Shaka tenga sus propios listeners de teclado.
+- Reproducción por teclado: J/L (10s), izquierda/derecha (5s), arriba/abajo (volumen 5%),
+  M (silencio), F (fullscreen), C (subtítulos), 0–9 (porcentaje), Home/End (inicio/final),
+  < y > (velocidad 0.25x–2x), coma/punto (fotogramas en pausa). Shift+N/P y teclas multimedia
+  cambian entre Shorts cargados; Shift+N en Watch abre el primer recomendado. Anterior fuera
+  de Shorts y capítulos no se implementan hasta tener una cola/capítulos reales.
 - Reproducción SABR/DASH con Shaka, poToken real, CORS ajustado para `googlevideo.com` y timedtext.
 - UI oficial de Shaka (`shaka.ui.Overlay`) creada con el mismo orden que FreeTube Lab: Overlay,
   controls/player, attach del `<video>`.
@@ -80,10 +97,13 @@ Pendiente para acercar más la página Watch a FreeTube:
 - Live chat/upcoming/premiere/error states.
 - Preferencias de ocultar secciones y modos avanzados.
 - Validación acumulada de pestañas especiales, filtros, audio original y tamaños compactos.
+- Restaurar pestañas y posiciones al reiniciar e incluirlas en el paquete local.
+- Paleta de acentos unificada pendiente de elección del usuario; colores actuales sin cambios.
 
 El estado anterior describe lo implementado, no una certificación de cada variante de YouTube.
 En la sesión del 2026-09-13 se confirmó arranque/reproducción por logs y hubo revisión manual del
 usuario; no se ejecutaron builds de producción, typechecks ni suites automatizadas.
+El usuario también confirmó manualmente el buen funcionamiento del flujo de pestañas y mini.
 
 ## Desarrollo
 

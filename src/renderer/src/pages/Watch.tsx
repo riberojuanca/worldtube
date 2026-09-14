@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChannelAvatar } from '../components/ChannelAvatar'
 import { VideoSaveActions } from '../components/VideoSaveButton'
@@ -6,8 +6,10 @@ import { VideoThumbnail } from '../components/VideoCard'
 import { WATCH_SLOT_ID } from '../player/GlobalPlayerHost'
 import { useGlobalPlayer } from '../player/GlobalPlayerContext'
 import { PLAYER_SEEK_EVENT } from '../player/events'
+import { usePlayerWorkspace } from '../player/PlayerWorkspace'
 import { useProfiles } from '../profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
+import { useAppTabs, usePageTab } from '../tabs/AppTabs'
 import type { SearchResultItem } from '../../../shared/ipc'
 
 type IconName = 'check' | 'clock' | 'copy' | 'eye' | 'tag' | 'thumb'
@@ -146,6 +148,13 @@ function RelatedVideoRow({ video }: { video: SearchResultItem }) {
 
 export function Watch() {
   const { videoId } = useParams<{ videoId: string }>()
+  const { active: isTabActive, id: tabId } = usePageTab()
+  const { rename } = useAppTabs()
+  const { requestPlayback } = usePlayerWorkspace()
+  const globalPlayer = useGlobalPlayer()
+  const snapshot = useRef(globalPlayer)
+  const openedVideo = useRef<string | null>(null)
+  if (globalPlayer.videoId === videoId && globalPlayer.status === 'ready') snapshot.current = globalPlayer
   const {
     playVideo,
     videoId: activeVideoId,
@@ -164,22 +173,30 @@ export function Watch() {
     relatedVideos,
     status,
     error
-  } = useGlobalPlayer()
+  } = globalPlayer.videoId === videoId ? globalPlayer : snapshot.current
+  const isCurrentVideo = globalPlayer.videoId === videoId
   const { activeProfileId } = useProfiles()
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
 
   useEffect(() => {
+    if (!isTabActive || openedVideo.current === videoId) return
+    openedVideo.current = videoId || null
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
     setIsDescriptionExpanded(false)
     setCopyState('idle')
     if (videoId && videoId !== activeVideoId) {
-      playVideo(videoId)
+      requestPlayback(tabId)
+      void globalPlayer.playVideo(videoId)
     }
     // Only re-run when the route param itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId])
+  }, [videoId, isTabActive])
+
+  useEffect(() => {
+    if (isCurrentVideo && title && status === 'ready') rename(tabId, title)
+  }, [isCurrentVideo, title, status, tabId, rename])
 
   useEffect(() => {
     if (!channelId) {
@@ -224,7 +241,7 @@ export function Watch() {
   }
 
   function seekTo(seconds: number) {
-    window.dispatchEvent(new CustomEvent(PLAYER_SEEK_EVENT, { detail: { seconds } }))
+    window.dispatchEvent(new CustomEvent(PLAYER_SEEK_EVENT, { detail: { seconds, tabId } }))
   }
 
   const detailPills: { icon: IconName; text: string }[] = []
@@ -237,14 +254,19 @@ export function Watch() {
     <div className="watch-layout">
       <section className="watch-video-area">
         <div className="watch-video-frame">
-          <div id={WATCH_SLOT_ID} className="aspect-video w-full overflow-hidden bg-black" />
+          {isCurrentVideo ? <div id={`${WATCH_SLOT_ID}-${tabId}`} className="aspect-video w-full overflow-hidden bg-black" /> : (
+            <div className="relative grid aspect-video w-full place-items-center overflow-hidden bg-black">
+              {snapshot.current.videoId === videoId && thumbnailUrl && <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-contain opacity-60" />}
+              <button type="button" onClick={() => videoId && void globalPlayer.playVideo(videoId)} className="relative rounded bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950">Reproducir video</button>
+            </div>
+          )}
         </div>
       </section>
 
       <section className="watch-info-area">
         {status === 'loading' && <p className="mt-4 text-sm text-neutral-400">Cargando…</p>}
         {status === 'error' && <p className="mt-4 text-sm text-red-400">{error}</p>}
-        {status === 'ready' && (
+        {status === 'ready' && snapshot.current.videoId === videoId && (
           <div className="watch-info-card">
             <h1 className="text-xl font-semibold leading-snug text-neutral-50">{title}</h1>
             {detailPills.length > 0 && (

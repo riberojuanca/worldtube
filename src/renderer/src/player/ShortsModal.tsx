@@ -6,7 +6,7 @@ import { SHORTS_SLOT_ID } from './GlobalPlayerHost'
 import { useGlobalPlayer } from './GlobalPlayerContext'
 
 export function ShortsModal() {
-  const { shorts, videoId, status, error, openShort, playVideo, closePlayer, dismissShorts } = useGlobalPlayer()
+  const { shorts, videoId, status, error, openShort, playVideo, closePlayer, dismissShorts, ownerTabId } = useGlobalPlayer()
   const dialogRef = useRef<HTMLDialogElement | null>(null)
   const location = useLocation()
   const previousPath = useRef(location.pathname)
@@ -73,7 +73,7 @@ export function ShortsModal() {
     <h2 id="shorts-title" className="sr-only">Shorts</h2>
     <div className="group/short-video relative aspect-[9/16] w-full overflow-hidden rounded bg-black">
       <div className={`absolute inset-0 ${slide ? slide.direction > 0 ? 'wt-short-enter-next' : 'wt-short-enter-previous' : ''}`}>
-      <div id={SHORTS_SLOT_ID} className="h-full w-full" />
+      <div id={`${SHORTS_SLOT_ID}-${ownerTabId}`} className="h-full w-full" />
       {status === 'loading' && <div role="status" className="pointer-events-none absolute inset-0 bg-black text-sm text-neutral-300">
         {short && <VideoThumbnail videoId={short.videoId} thumbnailUrl={short.thumbnailUrl} title={short.title} />}
         <span className="absolute inset-0 grid place-items-center bg-black/40">Cargando...</span>

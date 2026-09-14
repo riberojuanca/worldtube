@@ -1,6 +1,6 @@
 # WorldTube — Estado al 2026-09-13
 
-## Actualización actual: canales, biblioteca, Shorts y controles
+## Actualización actual: pestañas, atajos, canales y biblioteca
 
 Esta sección resume el estado vigente. Las secciones fechadas del 2026-09-12 más abajo
 conservan el historial y pueden describir stores o limitaciones que ya fueron reemplazados.
@@ -13,12 +13,47 @@ conservan el historial y pueden describir stores o limitaciones que ya fueron re
 - No alterar el comportamiento de un control como solución a un problema de espacio:
   el volumen debe expandirse horizontalmente junto a mute, como en FreeTube.
 - Todos los radios siguen en 3px; fuentes locales. No agregar login externo ni nube.
+- El usuario está eligiendo una paleta para unificar los acentos de la interfaz.
+  No cambiar todavía rojo de marca, verde de reproducción ni otros colores por iniciativa propia.
 - Si cambia main o preload, reiniciar el proceso de desarrollo. No atribuir todos los errores
   a HMR: el `.catch()` de `VideoSaveButton` era un bug real y fue corregido en el código.
 
+### Pestañas internas y reproducción independiente
+
+- `tabs/AppTabs.tsx` gestiona pestañas internas y un Router con navegador e historial
+  por pestaña. `TabPages` conserva las páginas montadas y sus contextos de navegación.
+- Crear/cerrar/reordenar por arrastre; Ctrl/cmd+clic o clic central abre enlaces internos
+  en segundo plano, con Shift selecciona la nueva. Cada pestaña conserva estado y scroll.
+- `TabPlayer` monta un `GlobalPlayerProvider` por pestaña. `TabPlayerMedia` crea el Host
+  solo cuando hay video, y lo mantiene al navegar o cambiar de pestaña.
+- `PlayerWorkspace.tsx` registra los reproductores y expone al shell el seleccionado con
+  video, o el último seleccionado con video. El mini es compartido, no el reproductor.
+- Watch abierto en segundo plano inicia reproducción en su primera selección y pausa los
+  demás. Una selección posterior conserva play/pausa; dar play manualmente en otro permite
+  reproducción simultánea. Solicitudes pendientes respetan quién pidió el último autoplay.
+- Pulsar el título del mini selecciona su pestaña original y vuelve a Watch dentro de ella.
+  Cerrar una pestaña desmonta su reproductor y detiene el video.
+- Slots y eventos multimedia están identificados por ID de pestaña; los controles del mini
+  y los atajos no deben afectar reproductores ajenos. Indicador por pestaña reproduciendo.
+- No se restauran pestañas/posiciones tras reiniciar ni se exportan en el paquete local.
+  Detalle del alcance y validación en `docs/TABS.md`.
+
+### Atajos de reproducción
+
+- Basados en la lista oficial: https://support.google.com/youtube/answer/7631406?hl=es
+- Espacio/K y tecla multimedia play-pausa; J/L ±10s, flechas izquierda/derecha ±5s,
+  arriba/abajo volumen 5%, M silencio, F fullscreen, C subtítulos disponibles.
+- 0–9 saltan por porcentaje, Home/End inicio/final, < y > velocidad 0.25x–2x,
+  coma/punto avanzan o retroceden fotogramas en pausa según fps (fallback 30).
+- Shift+N/P y teclas multimedia siguiente/anterior navegan Shorts cargados; Shift+N
+  en Watch abre el primer recomendado. Anterior fuera de Shorts y capítulos pendientes.
+- Guardas para escritura, composición, campos y diálogos ajenos; Espacio conserva la
+  activación de botones seleccionados. Captura evita toggles duplicados con Shaka.
+- El listener global se habilita solo para el reproductor representado por el workspace.
+
 ### Mini reproductor y barra minimizada
 
-- Un único video/player permanece montado en `GlobalPlayerHost`; cambia de slot mediante
+- Cada video/player de pestaña permanece montado en `GlobalPlayerHost`; cambia de slot mediante
   un mount DOM persistente. Minimizar/restaurar no requiere volver a presionar Play.
 - Mini arrastrable; al acercarlo abajo aparece una previsualización transparente con borde,
   ocultando el mini para no mostrar dos reproductores. Solo se fija la barra al soltar.
@@ -30,7 +65,8 @@ conservan el historial y pueden describir stores o limitaciones que ya fueron re
   y apunta abajo a la izquierda. Mini actual: 480px máximo en desktop, aspect-ratio 16:9.
 - Barra minimizada ocupa el área de contenido sin tapar la navegación izquierda. Timeline
   central editable, seek por tiempo y volumen; rangos sin borde y con radio global.
-- `PLAYER_COMMAND_EVENT` admite `seek-to` y `set-volume`; `PLAYER_STATE_EVENT` incluye volumen.
+- `PLAYER_COMMAND_EVENT` admite `seek-to`, `set-volume` y `pause-others`;
+  comandos, seek y `PLAYER_STATE_EVENT` incluyen ID de pestaña; estado incluye volumen.
 
 ### Biblioteca local: dos acciones distintas
 
@@ -64,8 +100,9 @@ conservan el historial y pueden describir stores o limitaciones que ya fueron re
 
 ### Modal de Shorts
 
-- Slot `#global-player-shorts-slot` tiene prioridad sobre Watch/mini. El mini se oculta mientras
-  el modal está abierto; no se crea otro Shaka ni un segundo video.
+- Slot `#global-player-shorts-slot-<tabId>` tiene prioridad sobre Watch/mini del reproductor
+  representado. El mini se oculta mientras el modal está abierto; Shorts reutiliza el video
+  de su pestaña, sin crear otro Shaka para el modal.
 - Modal nativo `dialog`: mismo ancho que el video, tamaño limitado por ventana, sin scrollbar
   del modal. Escape, cerrar o clic afuera detienen el Short y cancelan solicitudes pendientes.
 - Barra derecha alineada al alto del video: cerrar y conteo arriba, solo anterior/siguiente
@@ -107,11 +144,14 @@ conservan el historial y pueden describir stores o limitaciones que ya fueron re
   además de reinicios de Electron para main/preload. El último reinicio fue tras corregir
   `.catch()` unido erróneamente a `addEventListener` y separar Guardar/Playlists globalmente.
 - No se ejecutaron builds de producción, typechecks ni suites automatizadas en esta sesión.
+- El usuario confirmó manualmente que el flujo de pestañas y la corrección del mini van muy bien.
+  Esto no certifica todos los atajos, casos de reproducción simultánea ni carreras de carga.
 - Pendiente: validación acumulada de pestañas especiales, filtros/categorías y continuaciones,
   audio original con múltiples idiomas, persistencia tras reinicio/export-import y tamaños
   compactos en distintas pantallas. No describir esos casos como pruebas ya realizadas.
 - Siguen pendientes capítulos, comentarios, playlist/queue en sidebar de Watch, live chat
   y estados avanzados, y preferencias para ocultar secciones.
+- Pendientes restauración/export de pestañas y paleta de acentos elegida por el usuario.
 
 App de escritorio propia para YouTube, continuación del laboratorio hecho sobre FreeTube en
 `../freetube-audio-lab` (ver su `MINI_PLAYER_HANDOFF.md`). Código propio, aprendizaje reusado.
