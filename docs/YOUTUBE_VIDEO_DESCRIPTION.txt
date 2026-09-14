@@ -85,7 +85,7 @@ It includes:
 - Local export and import
 - Automatic update checks
 
-I wanted a more desktop-oriented experience, especially around tabs and persistent playback. It is still an early project, so I’m looking for feedback about usability, packaging and missing features.
+I built WorldTube as a local-first desktop application for watching YouTube content, with local profiles, persistent playback and independent tabs. I’m sharing it because the project is now publicly available, with its source code, releases and a short demo.
 
 Demo: https://youtu.be/ccULEv3KD28
 GitHub: https://github.com/riberojuanca/worldtube
