@@ -64,3 +64,31 @@ GitHub: https://github.com/riberojuanca/worldtube
 Downloads: https://riberojuanca.github.io/worldtube/
 
 Feedback, bug reports and suggestions are welcome.
+
+
+REDDIT: R/SIDEPROJECT
+
+TITLE
+WorldTube – an AGPL desktop video client with tabs and a persistent mini player
+
+TEXT
+I built WorldTube, an AGPL-licensed local-first desktop video client for Windows and Linux.
+
+It includes:
+
+- Persistent mini player
+- Independent tabs
+- Local profiles and accounts
+- Saved videos and playlists
+- Keyboard shortcuts
+- Live video support
+- Local export and import
+- Automatic update checks
+
+I wanted a more desktop-oriented experience, especially around tabs and persistent playback. It is still an early project, so I’m looking for feedback about usability, packaging and missing features.
+
+Demo: https://youtu.be/ccULEv3KD28
+GitHub: https://github.com/riberojuanca/worldtube
+Downloads: https://riberojuanca.github.io/worldtube/
+
+It is not affiliated with or endorsed by YouTube.
