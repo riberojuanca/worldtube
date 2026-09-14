@@ -69,20 +69,37 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
     typeof window.api.createSavedPlaylist === 'function'
 
   useEffect(() => {
-    if ((!isOpen && mode !== 'saved') || !canManageSavedVideos) return
+    if (!canManageSavedVideos) return
     let cancelled = false
     setIsLoaded(false)
+    setSavedVideos([])
 
-    const load = () => Promise.all([mode === 'saved' ? Promise.resolve([]) : window.api.listSavedPlaylists(), window.api.listSavedVideos()])
-      .then(([playlistItems, savedItems]) => {
+    const load = () => window.api.listSavedVideos()
+      .then((savedItems) => {
         if (cancelled) return
-        setPlaylists(playlistItems)
         setSavedVideos(savedItems)
         setIsLoaded(true)
       })
       .catch(() => {
         if (!cancelled) setStatus('No se pudo cargar')
       })
+    void load()
+    window.addEventListener(PROFILE_DATA_CHANGED_EVENT, load)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(PROFILE_DATA_CHANGED_EVENT, load)
+    }
+  }, [canManageSavedVideos, activeProfileId, video.videoId])
+
+  useEffect(() => {
+    if (!isOpen || mode === 'saved' || !canManageSavedVideos) return
+    let cancelled = false
+    const load = () => window.api.listSavedPlaylists().then((items) => {
+      if (!cancelled) setPlaylists(items)
+    }).catch(() => {
+      if (!cancelled) setStatus('No se pudo cargar')
+    })
     void load()
     window.addEventListener(PROFILE_DATA_CHANGED_EVENT, load)
 
@@ -101,6 +118,9 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
   const savedPlaylistIds = useMemo(() => {
     return new Set(savedVideos.filter((entry) => entry.videoId === video.videoId).map((entry) => entry.playlistId ?? null))
   }, [savedVideos, video.videoId])
+  const isInPlaylist = isLoaded && [...savedPlaylistIds].some((id) => id !== null)
+  const isActionActive = mode === 'saved' ? isLoaded && savedPlaylistIds.has(null)
+    : mode === 'playlists' && isInPlaylist
 
   async function refreshSavedState() {
     const [playlistItems, savedItems] = await Promise.all([window.api.listSavedPlaylists(), window.api.listSavedVideos()])
@@ -158,13 +178,14 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
     } finally { setIsBusy(false) }
   }
 
-  const actionLabel = mode === 'playlists' ? 'Agregar a playlist'
+  const actionLabel = mode === 'playlists' ? isInPlaylist ? 'En playlists: gestionar playlists' : 'Agregar a playlist'
     : mode === 'saved' ? savedPlaylistIds.has(null) ? 'Quitar de Guardados' : 'Guardar en Guardados' : 'Guardar'
 
   return (
     <div ref={rootRef} className={className} onClick={stopClick}>
       <button
         type="button"
+        data-saved={isActionActive ? 'true' : undefined}
         disabled={!canManageSavedVideos || isBusy || (mode === 'saved' && !isLoaded)}
         onClick={() => { if (mode === 'saved') void toggleSaved(); else setIsOpen((value) => !value) }}
         className={
@@ -173,22 +194,24 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
         }
         aria-label={actionLabel}
         aria-pressed={mode === 'saved' ? savedPlaylistIds.has(null) : undefined}
+        aria-haspopup={mode !== 'saved' ? 'dialog' : undefined}
+        aria-expanded={mode !== 'saved' ? isOpen : undefined}
         title={canManageSavedVideos ? actionLabel : 'Reinicia la app para activar Guardar'}
       >
-        {mode === 'playlists' ? <span aria-hidden="true" className="text-xl leading-none">+</span> : <SaveIcon filled={mode === 'saved' && savedPlaylistIds.has(null)} />}
+        {mode === 'playlists' ? isInPlaylist ? <CheckIcon /> : <span aria-hidden="true" className="text-xl leading-none">+</span> : <SaveIcon filled={mode === 'saved' && savedPlaylistIds.has(null)} />}
         {label && <span>{label}</span>}
       </button>
 
       {mode === 'saved' && status && <span role="status" className="sr-only">{status}</span>}
       {isOpen && mode !== 'saved' && (
-        <div className={`absolute right-0 z-30 w-64 rounded border border-neutral-800 bg-neutral-950 p-2 shadow-2xl shadow-black/40 ${menuPosition === 'above' ? 'bottom-10' : 'top-9'}`}>
+        <div role="dialog" aria-label="Guardar en playlists" className={`absolute right-0 z-30 w-64 rounded border border-neutral-800 bg-neutral-950 p-2 shadow-2xl shadow-black/40 ${menuPosition === 'above' ? 'bottom-10' : 'top-9'}`}>
           {mode === 'combined' && <><button
             type="button"
             className={optionClass(savedPlaylistIds.has(null))}
             onClick={() => (savedPlaylistIds.has(null) ? removeFrom(null) : saveTo(null))}
           >
             <span className="truncate">Guardados</span>
-            {savedPlaylistIds.has(null) && <CheckIcon className="h-4 w-4 shrink-0 text-emerald-400" />}
+            {savedPlaylistIds.has(null) && <CheckIcon className="wt-accent-text h-4 w-4 shrink-0" />}
           </button>
 
           <div className="my-2 border-t border-neutral-800" /></>}
@@ -207,7 +230,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
                     onClick={() => (isSaved ? removeFrom(playlist.id) : saveTo(playlist.id))}
                   >
                     <span className="truncate">{playlist.name}</span>
-                    {isSaved && <CheckIcon className="h-4 w-4 shrink-0 text-emerald-400" />}
+                    {isSaved && <CheckIcon className="wt-accent-text h-4 w-4 shrink-0" />}
                   </button>
                 )
               })
@@ -221,7 +244,7 @@ export function VideoSaveButton({ video, className = '', buttonClassName, label,
               placeholder="Nueva playlist"
               className="min-w-0 flex-1 rounded border border-neutral-800 bg-neutral-900 px-2 text-sm outline-none focus:border-neutral-600"
             />
-            <button type="submit" className="rounded bg-neutral-100 px-2 text-sm font-medium text-neutral-950 hover:bg-white">
+            <button type="submit" className="wt-action rounded px-2 text-sm font-medium">
               Crear
             </button>
           </form>

@@ -6,6 +6,16 @@
   font-family: var(--wt-font-family) !important;
 }
 
+.shaka-video-container {
+  --shaka-badge-active: var(--wt-important);
+  --shaka-thumb-color: var(--wt-accent-text);
+  --shaka-track-color: var(--wt-accent);
+  --shaka-rate-border-active: var(--wt-accent-text);
+  --shaka-rate-bg-active: var(--wt-accent-soft);
+  --shaka-rate-preset-active: var(--wt-accent-soft);
+  --shaka-rate-preset-border: var(--wt-accent-text);
+}
+
 .shaka-video-container,
 .shaka-video-container *,
 .shaka-video-container *::before,
@@ -13,11 +23,11 @@
   border-radius: var(--wt-radius) !important;
 }
 
-#global-player-mini-slot .shaka-content-title {
+[id^='global-player-mini-slot-'] .shaka-content-title {
   display: none !important;
 }
 
-#global-player-shorts-slot .shaka-content-title {
+[id^='global-player-shorts-slot-'] .shaka-content-title {
   display: none !important;
 }
 
@@ -53,27 +63,27 @@
   }
 }
 
-:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-video-container {
+:is([id^='global-player-mini-slot-'], [id^='global-player-shorts-slot-']) .shaka-video-container {
   container-type: inline-size;
 }
 
-:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-controls-button-panel {
+:is([id^='global-player-mini-slot-'], [id^='global-player-shorts-slot-']) .shaka-controls-button-panel {
   justify-content: flex-start;
   min-width: 0;
 }
 
-:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-controls-button-panel > .shaka-spacer {
+:is([id^='global-player-mini-slot-'], [id^='global-player-shorts-slot-']) .shaka-controls-button-panel > .shaka-spacer {
   flex: 1 1 0;
   min-width: 0;
 }
 
-:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-volume-bar-container {
+:is([id^='global-player-mini-slot-'], [id^='global-player-shorts-slot-']) .shaka-volume-bar-container {
   min-width: 0;
   flex-shrink: 0;
 }
 
-:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-volume-bar-container:is(:hover, :focus-within),
-:is(#global-player-mini-slot, #global-player-shorts-slot) .shaka-mute-button:hover + .shaka-volume-bar-container-allow-hiding {
+:is([id^='global-player-mini-slot-'], [id^='global-player-shorts-slot-']) .shaka-volume-bar-container:is(:hover, :focus-within),
+:is([id^='global-player-mini-slot-'], [id^='global-player-shorts-slot-']) .shaka-mute-button:hover + .shaka-volume-bar-container-allow-hiding {
   width: clamp(24px, calc(100cqw - 280px), 100px) !important;
   opacity: 1 !important;
 }

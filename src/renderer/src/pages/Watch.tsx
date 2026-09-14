@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChannelAvatar } from '../components/ChannelAvatar'
+import { SubscribeButton } from '../components/SubscribeButton'
 import { VideoSaveActions } from '../components/VideoSaveButton'
 import { VideoThumbnail } from '../components/VideoCard'
 import { WATCH_SLOT_ID } from '../player/GlobalPlayerHost'
@@ -12,13 +13,13 @@ import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import { useAppTabs, usePageTab } from '../tabs/AppTabs'
 import type { SearchResultItem } from '../../../shared/ipc'
 
-type IconName = 'check' | 'clock' | 'copy' | 'eye' | 'tag' | 'thumb'
+type IconName = 'check' | 'clock' | 'share' | 'eye' | 'tag' | 'thumb'
 
 function Icon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
   const paths: Record<IconName, JSX.Element> = {
     check: <path d="m5 12 4 4L19 6" />,
     clock: <path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
-    copy: <path d="M8 8h10v10H8zM6 16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />,
+    share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" /></>,
     eye: <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />,
     tag: <path d="M20 10v8a2 2 0 0 1-2 2h-8L4 14V6a2 2 0 0 1 2-2h8l6 6Z M8 8h.01" />,
     thumb: <path d="M7 11v9M7 11H4v9h3M7 11l4-8h1.5a2 2 0 0 1 2 2.3L14 8h4a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 16.8 19H7" />
@@ -77,7 +78,7 @@ function DescriptionWithTimestamps({ text, onSeek }: { text: string; onSeek: (se
           key={`${index}:${value}`}
           type="button"
           onClick={() => onSeek(seconds)}
-          className="rounded px-1 font-medium text-sky-300 hover:bg-sky-400/10 hover:text-sky-200"
+          className="wt-link rounded px-1 font-medium"
         >
           {value}
         </button>
@@ -246,6 +247,7 @@ export function Watch() {
 
   const detailPills: { icon: IconName; text: string }[] = []
   if (viewCountText) detailPills.push({ icon: 'eye', text: viewCountText })
+  if (likeCountText) detailPills.push({ icon: 'thumb', text: likeCountText })
   if (publishedText) detailPills.push({ icon: 'clock', text: publishedText })
   if (durationText) detailPills.push({ icon: 'clock', text: durationText })
   if (category) detailPills.push({ icon: 'tag', text: category })
@@ -257,7 +259,7 @@ export function Watch() {
           {isCurrentVideo ? <div id={`${WATCH_SLOT_ID}-${tabId}`} className="aspect-video w-full overflow-hidden bg-black" /> : (
             <div className="relative grid aspect-video w-full place-items-center overflow-hidden bg-black">
               {snapshot.current.videoId === videoId && thumbnailUrl && <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-contain opacity-60" />}
-              <button type="button" onClick={() => videoId && void globalPlayer.playVideo(videoId)} className="relative rounded bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950">Reproducir video</button>
+              <button type="button" onClick={() => videoId && void globalPlayer.playVideo(videoId)} className="wt-action relative rounded px-4 py-2 text-sm font-medium">Reproducir video</button>
             </div>
           )}
         </div>
@@ -278,9 +280,10 @@ export function Watch() {
             )}
 
             <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <ChannelAvatar name={channelName} thumbnailUrl={channelThumbnailUrl} className="h-11 w-11" />
-                <div className="min-w-0">
+              <div className="flex min-w-0 flex-[1_1_280px] flex-wrap items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <ChannelAvatar name={channelName} thumbnailUrl={channelThumbnailUrl} className="h-11 w-11" />
+                  <div className="min-w-0 max-w-64">
                   {channelId ? (
                     <Link to={`/channel/${channelId}`} className="block truncate font-medium text-neutral-200 hover:text-white">
                       {channelName}
@@ -289,32 +292,14 @@ export function Watch() {
                     <p className="truncate font-medium text-neutral-200">{channelName}</p>
                   )}
                   {subscriberCountText && <p className="truncate text-sm text-neutral-500">{subscriberCountText}</p>}
+                  </div>
                 </div>
+                {channelId && (
+                  <SubscribeButton subscribed={isSubscribed} onClick={toggleSubscription} />
+                )}
               </div>
 
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {channelId && (
-                  <button
-                    type="button"
-                    onClick={toggleSubscription}
-                    className={
-                      isSubscribed
-                        ? 'inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200 hover:bg-neutral-700'
-                        : 'inline-flex h-9 items-center gap-2 rounded-full bg-neutral-100 px-4 text-sm font-medium text-neutral-950 hover:bg-white'
-                    }
-                  >
-                    {isSubscribed && <Icon name="check" className="h-4 w-4" />}
-                    {isSubscribed ? 'Suscripto' : 'Suscribirse'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={copyShareLink}
-                  className="inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200 hover:bg-neutral-700"
-                >
-                  <Icon name="copy" className="h-4 w-4" />
-                  {copyState === 'copied' ? 'Copiado' : copyState === 'error' ? 'Error' : 'Copiar enlace'}
-                </button>
+              <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
                 {videoId && (
                   <VideoSaveActions
                     className="relative"
@@ -323,12 +308,15 @@ export function Watch() {
                     video={{ videoId, title, channelId, channelName, thumbnailUrl, playlistId: null }}
                   />
                 )}
-                {likeCountText && (
-                  <span className="inline-flex h-9 items-center gap-2 rounded-full bg-neutral-800 px-4 text-sm font-medium text-neutral-200">
-                    <Icon name="thumb" className="h-4 w-4" />
-                    {likeCountText}
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={copyShareLink}
+                  aria-label={copyState === 'copied' ? 'Enlace copiado' : copyState === 'error' ? 'No se pudo copiar el enlace' : 'Compartir: copiar enlace'}
+                  title={copyState === 'copied' ? 'Enlace copiado' : copyState === 'error' ? 'No se pudo copiar el enlace' : 'Compartir: copiar enlace'}
+                  className={`grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded bg-neutral-800 hover:bg-neutral-700 ${copyState === 'copied' ? 'wt-accent-text' : copyState === 'error' ? 'text-red-400' : 'text-neutral-200'}`}
+                >
+                  <Icon name={copyState === 'copied' ? 'check' : 'share'} className="h-4 w-4" />
+                </button>
               </div>
             </div>
 

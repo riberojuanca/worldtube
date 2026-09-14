@@ -6,6 +6,19 @@ de este repo es propio.
 
 No afiliado a Google/YouTube. Nombre provisional.
 
+## Instalación
+
+**En desarrollo: todavía no hay instaladores de WorldTube generados por este repo.**
+Los comandos de abajo son para ejecutar desde el código, no una instalación para
+usuarios finales. Compilar con `pnpm build` tampoco genera un instalador.
+
+Hoy se requiere una copia del código, Node.js compatible con las herramientas del
+proyecto y pnpm instalado (o Corepack instalado para ejecutar pnpm). Ver [Desarrollo](#desarrollo).
+
+Windows, macOS y Linux son objetivos de distribución, no plataformas certificadas
+por esta sesión. Formatos propuestos y trabajo pendiente en
+[docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+
 ## Forma de trabajo
 
 Cuando una funcionalidad ya existe en `../freetube-audio-lab`, el flujo correcto es:
@@ -34,6 +47,9 @@ para el puente SABR/UMP.
 Funciona:
 
 - Base visual: todos los redondeos van a 3px. La fuente base usa Inter local por defecto, con Inter Tight local disponible para comparar; Roboto no se carga desde la nube.
+- Paleta de acentos centralizada en variables CSS: #1C4859, #196273 y #166973 para
+  selección/controles; #BF8D30 para acciones importantes. Logo con tres mundos sólidos
+  locales y un símbolo de play dorado. Roles y edición en [docs/THEME.md](docs/THEME.md).
 - Usuarios/sesión local: usuario local con contraseña opcional, login/logout, perfil activo arriba a la derecha, edición de nombre/foto/color desde ese menú, panel Cuenta para datos locales y export/import completo.
 - Shell Electron con navegación, header, sidebar y mini reproductor flotante arrastrable.
 - Pestañas internas: crear, cerrar, reordenar, historial y scroll independientes. Ctrl/cmd+clic
@@ -59,6 +75,10 @@ Funciona:
   Deslizamiento vertical al usar las flechas y avance automático entre los Shorts cargados.
 - Guardar y agregar a playlists son acciones separadas en miniaturas, relacionados, Watch y
   Shorts. Guardar agrega/quita en Guardados; el signo + permite elegir o crear playlists locales.
+  Si el video ya está en alguna playlist, el + cambia por un tick y toma el acento de Guardar.
+- Suscribirse queda junto al canal; al activarlo mantiene dorado y añade segmento azul verdoso
+  con tick. Compartir queda al extremo derecho, solo icono; me gusta va entre las estadísticas.
+- Scroll oscuro neutro, incluyendo barras internas de Shaka, sin cambiar ancho ni forma.
 - Volumen y silencio globales persistidos en `settings.playerAudio`; prioridad al audio original
   en SABR/DASH. Volumen horizontal expandible, sin barra flotante, en controles compactos.
 - Búsqueda general con historial por perfil y sugerencias remotas; fallback de miniaturas de
@@ -98,7 +118,8 @@ Pendiente para acercar más la página Watch a FreeTube:
 - Preferencias de ocultar secciones y modos avanzados.
 - Validación acumulada de pestañas especiales, filtros, audio original y tamaños compactos.
 - Restaurar pestañas y posiciones al reiniciar e incluirlas en el paquete local.
-- Paleta de acentos unificada pendiente de elección del usuario; colores actuales sin cambios.
+- Validación visual acumulada en otras pantallas y plataformas.
+- Empaquetado, instaladores y publicación de releases; ver [distribución](docs/DISTRIBUTION.md).
 
 El estado anterior describe lo implementado, no una certificación de cada variante de YouTube.
 En la sesión del 2026-09-13 se confirmó arranque/reproducción por logs y hubo revisión manual del
@@ -108,12 +129,13 @@ El usuario también confirmó manualmente el buen funcionamiento del flujo de pe
 ## Desarrollo
 
 ```bash
-corepack pnpm install
-corepack pnpm dev
-corepack pnpm run typecheck
-corepack pnpm run build
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 El renderer corre en `http://localhost:5173/` durante desarrollo. Si tocás `src/main/` o
-`src/preload/` y la app no refleja el cambio, reiniciá `corepack pnpm dev`; Electron/Vite a veces
+`src/preload/` y la app no refleja el cambio, reiniciá `pnpm dev`; Electron/Vite a veces
 deja el renderer con HMR activo pero el proceso principal con un build viejo.
+
+`pnpm typecheck` y `pnpm build` son comandos disponibles para validación/compilación
+cuando se soliciten; no son pasos que haya que ejecutar en cada cambio ni generan instaladores.

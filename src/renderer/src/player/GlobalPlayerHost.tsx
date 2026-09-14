@@ -214,7 +214,11 @@ export function GlobalPlayerHost() {
   useEffect(() => {
     const ui = uiRef.current
     if (!ui) return
-    ui.configure({ controlPanelElements: isWatchRoute && shorts.length === 0 ? fullControlPanelRef.current
+    ui.configure({
+      seekBarColors: { base: 'var(--wt-track)', buffered: 'var(--wt-buffered)', played: 'var(--wt-accent)', adBreaks: 'var(--wt-important)', chapters: 'var(--wt-important)' },
+      volumeBarColors: { base: 'var(--wt-track)', level: 'var(--wt-accent)' },
+      playbackRateBarColors: { base: 'var(--wt-track)', level: 'var(--wt-accent)' },
+      controlPanelElements: isWatchRoute && shorts.length === 0 ? fullControlPanelRef.current
       : ['play_pause', 'mute', 'volume', 'time_and_duration', 'spacer', 'queue', 'overflow_menu', 'fullscreen'] })
   }, [isWatchRoute, shorts.length, rawVideoEl, containerEl])
 
@@ -558,7 +562,7 @@ export function GlobalPlayerHost() {
               <button
                 type="button"
                 onClick={() => videoId && playVideo(videoId)}
-                className="rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-950 hover:bg-white"
+                className="wt-action rounded px-3 py-1.5 text-sm font-medium"
               >
                 Reintentar
               </button>

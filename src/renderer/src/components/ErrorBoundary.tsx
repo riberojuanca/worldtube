@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="mx-auto max-w-xl rounded-lg border border-red-900 bg-red-950/40 p-4">
           <p className="font-medium text-red-300">Esta página tuvo un error y no se pudo mostrar.</p>
           <p className="mt-1 text-sm text-neutral-400">{this.state.error.message}</p>
-          <a href="#/" className="mt-3 inline-block rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-950 hover:bg-white">
+          <a href="#/" className="wt-action mt-3 inline-block rounded px-3 py-1.5 text-sm font-medium">
             Volver al inicio
           </a>
         </div>

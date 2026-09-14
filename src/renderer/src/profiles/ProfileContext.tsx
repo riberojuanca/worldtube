@@ -73,7 +73,7 @@ function SetupLocalUser({ onCreate }: { onCreate: (request: CreateLocalUserReque
           className="h-10 rounded border border-neutral-700 bg-neutral-950 px-3 text-sm outline-none focus:border-neutral-500"
         />
         {error && <p className="text-sm text-red-400">{error}</p>}
-        <button type="submit" className="h-10 rounded bg-neutral-100 px-3 text-sm font-medium text-neutral-950 hover:bg-white">
+        <button type="submit" className="wt-action-important h-10 rounded px-3 text-sm font-medium">
           Empezar
         </button>
       </form>
@@ -132,7 +132,7 @@ function LoginLocalUser({
           />
         )}
         {error && <p className="text-sm text-red-400">{error}</p>}
-        <button type="submit" className="h-10 rounded bg-neutral-100 px-3 text-sm font-medium text-neutral-950 hover:bg-white">
+        <button type="submit" className="wt-action-important h-10 rounded px-3 text-sm font-medium">
           Entrar
         </button>
       </form>

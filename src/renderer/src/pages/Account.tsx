@@ -300,7 +300,7 @@ export function Account() {
             <p>No se exporta: cachés temporales de video, procesos de reproducción, tokens efímeros de YouTube ni archivos de build.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={handleExport} className="rounded bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white">
+            <button type="button" onClick={handleExport} className="wt-action-important rounded px-3 py-2 text-sm font-medium">
               Exportar todo
             </button>
             <button type="button" onClick={handleImport} className="rounded bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-700">

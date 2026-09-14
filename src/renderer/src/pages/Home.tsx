@@ -67,7 +67,7 @@ export function Home() {
           />
           <button
             type="submit"
-            className="rounded bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-white"
+            className="wt-action rounded px-4 py-2 text-sm font-medium"
           >
             Reproducir
           </button>

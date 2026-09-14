@@ -13,10 +13,29 @@ conservan el historial y pueden describir stores o limitaciones que ya fueron re
 - No alterar el comportamiento de un control como solución a un problema de espacio:
   el volumen debe expandirse horizontalmente junto a mute, como en FreeTube.
 - Todos los radios siguen en 3px; fuentes locales. No agregar login externo ni nube.
-- El usuario está eligiendo una paleta para unificar los acentos de la interfaz.
-  No cambiar todavía rojo de marca, verde de reproducción ni otros colores por iniciativa propia.
+- Paleta elegida: #1C4859, #196273, #166973 y #BF8D30. Variables raíz en `index.css`;
+  no introducir acentos aislados por componente. Dorado para acciones importantes.
+  Logo con tres mundos sólidos Material Design locales y play dorado; ver `docs/THEME.md`.
 - Si cambia main o preload, reiniciar el proceso de desarrollo. No atribuir todos los errores
   a HMR: el `.catch()` de `VideoSaveButton` era un bug real y fue corregido en el código.
+
+### Tema, acciones y distribución
+
+- Paleta centralizada y roles en `docs/THEME.md`. Marca final de esta iteración:
+  tres mundos sólidos Material Design muy juntos, más play dorado rectangular 24x16px.
+- `SubscribeButton` compartido mantiene dorado y añade segmento de acento con tick al
+  suscribirse. En Watch se ubica al lado de avatar/nombre/suscriptores del canal.
+- Compartir en Watch usa solo icono al extremo derecho; copia enlace y confirma con tick.
+  Me gusta se muestra en estadísticas, no en la fila de acciones.
+- Playlists usa tick/acento cuando el video está en alguna lista, manteniendo el selector.
+  Estado de biblioteca se carga independientemente de la apertura del menú.
+- Scroll nativo oscuro con scrollbar-color neutro que anula blancos internos de Shaka.
+  No cambiar tamaño/forma ni usar paleta en el scroll: el usuario lo pidió expresamente.
+- Usuario revisó manualmente estos ajustes y autorizó documentar/commitear. Sin builds
+  ni typechecks/pruebas automatizadas; no describir todas las variantes como certificadas.
+- README aclara instalación desde código y ausencia de instaladores. Investigación de
+  FreeTube y propuesta en `docs/DISTRIBUTION.md`; no se configuró empaquetado ni CI.
+- Esta copia no tiene remoto Git configurado: commits locales, sin push ni publicación.
 
 ### Pestañas internas y reproducción independiente
 
@@ -151,7 +170,8 @@ conservan el historial y pueden describir stores o limitaciones que ya fueron re
   compactos en distintas pantallas. No describir esos casos como pruebas ya realizadas.
 - Siguen pendientes capítulos, comentarios, playlist/queue en sidebar de Watch, live chat
   y estados avanzados, y preferencias para ocultar secciones.
-- Pendientes restauración/export de pestañas y paleta de acentos elegida por el usuario.
+- Pendientes restauración/export de pestañas, validación visual en otras plataformas y
+  empaquetado/publicación de instaladores según `docs/DISTRIBUTION.md`.
 
 App de escritorio propia para YouTube, continuación del laboratorio hecho sobre FreeTube en
 `../freetube-audio-lab` (ver su `MINI_PLAYER_HANDOFF.md`). Código propio, aprendizaje reusado.

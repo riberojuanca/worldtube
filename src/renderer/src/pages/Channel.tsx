@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { ChannelAvatar } from '../components/ChannelAvatar'
+import { SubscribeButton } from '../components/SubscribeButton'
 import { VideoCard } from '../components/VideoCard'
 import { useProfiles } from '../profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
@@ -202,10 +203,7 @@ export function Channel() {
         {channel.subscriberCountText && <p className="mt-1 text-sm text-neutral-400">{channel.subscriberCountText}</p>}
         {channel.description && <button type="button" onClick={() => changeTab('about')} className="mt-2 line-clamp-2 text-left text-sm text-neutral-400 hover:text-neutral-200">{channel.description}</button>}
       </div>
-      <button type="button" disabled={subscriptionBusy} onClick={toggleSubscription}
-        className={`shrink-0 rounded px-4 py-2 text-sm font-medium ${isSubscribed ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700' : 'bg-neutral-100 text-neutral-950 hover:bg-white'}`}>
-        {isSubscribed ? 'Suscripto' : 'Suscribirse'}
-      </button>
+      <SubscribeButton subscribed={isSubscribed} busy={subscriptionBusy} onClick={toggleSubscription} />
     </header>
     <div role="tablist" aria-label="Secciones del canal" className="mb-5 flex gap-5 overflow-x-auto border-b border-neutral-800">
       {tabs.map((item) => <button key={item} type="button" role="tab" id={`channel-tab-${item}`} aria-controls="channel-content" aria-selected={tab === item}
@@ -219,7 +217,7 @@ export function Channel() {
           changeTab(tabs[nextIndex])
           document.getElementById(`channel-tab-${tabs[nextIndex]}`)?.focus()
         }}
-        onClick={() => changeTab(item)} className={`shrink-0 border-b-2 py-3 text-sm font-medium ${tab === item ? 'border-white text-white' : 'border-transparent text-neutral-400 hover:text-white'}`}>
+        onClick={() => changeTab(item)} className={`shrink-0 border-b-2 py-3 text-sm font-medium ${tab === item ? 'wt-tab-selected' : 'border-transparent text-neutral-400 hover:text-white'}`}>
         {TAB_LABELS[item]}
       </button>)}
     </div>
@@ -245,7 +243,7 @@ export function Channel() {
           {page.about.details.map((detail, index) => <p key={index} className="mb-2 text-sm text-neutral-400">{detail}</p>)}
         </section>}
         {page.about.links.length > 0 && <section className="border-t border-neutral-800 pt-5"><h2 className="mb-3 text-lg font-semibold">Enlaces</h2>
-          {page.about.links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="mb-2 block break-words text-sm text-emerald-400 hover:underline">{link.title}</a>)}
+          {page.about.links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="wt-link mb-2 block break-words text-sm hover:underline">{link.title}</a>)}
         </section>}
       </div>}
       {tab === 'home' && !playlistId && (page?.sections.length ?? 0) > 0 ? <div className="space-y-8">

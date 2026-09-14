@@ -44,5 +44,5 @@ certifican todas las carreras de carga ni variantes de reproduccion simultanea.
 
 ## Proximo trabajo visual
 
-El usuario esta eligiendo una paleta de acentos para usar en toda la interfaz.
-Marca roja e indicador verde actuales se mantienen hasta recibir esa eleccion.
+Paleta elegida y aplicada mediante variables CSS; el indicador usa el rol de
+acento y la marca muestra tres globos y play dorado. Detalles en `docs/THEME.md`.

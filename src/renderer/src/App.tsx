@@ -15,6 +15,7 @@ import { ShortsModal } from './player/ShortsModal'
 import { PLAYER_COMMAND_EVENT, PLAYER_STATE_EVENT, type PlayerCommandDetail, type PlayerStateDetail } from './player/events'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChannelAvatar } from './components/ChannelAvatar'
+import { BrandMark } from './components/BrandMark'
 import { ProfileProvider, useProfiles } from './profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from './profiles/events'
 import { Channel } from './pages/Channel'
@@ -250,7 +251,7 @@ function ProfileMenu() {
                   Quitar
                 </button>
               )}
-              <button type="submit" className="ml-auto rounded bg-neutral-100 px-2 py-2 text-sm font-medium text-neutral-950 hover:bg-white">
+              <button type="submit" className="wt-action ml-auto rounded px-2 py-2 text-sm font-medium">
                 Guardar
               </button>
             </div>
@@ -264,7 +265,7 @@ function ProfileMenu() {
                 onClick={() => handleSelect(profile.id)}
                 className={[
                   'flex min-w-0 items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-neutral-800',
-                  profile.id === activeProfileId ? 'bg-neutral-800 text-white' : 'text-neutral-300'
+                  profile.id === activeProfileId ? 'wt-selected' : 'text-neutral-300'
                 ].join(' ')}
               >
                 <ProfileAvatar profile={profile} />
@@ -480,7 +481,7 @@ function TopNav({ isSideNavOpen, onToggleSideNav }: { isSideNavOpen: boolean; on
             className="ml-1 flex h-10 min-w-0 items-center gap-2 rounded px-3 text-lg font-semibold text-neutral-100 hover:bg-neutral-800"
             title="WorldTube"
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-red-600 text-xs font-bold text-white">WT</span>
+            <BrandMark />
             <span className="truncate max-[680px]:hidden">WorldTube</span>
           </Link>
         </div>
@@ -521,7 +522,7 @@ function navClass(isOpen: boolean, isActive: boolean): string {
   return [
     'group flex min-h-[45px] items-center px-3 py-2 text-neutral-300 no-underline transition-colors hover:bg-neutral-800 hover:text-white max-[680px]:min-h-0 max-[680px]:flex-1 max-[680px]:flex-col max-[680px]:justify-center max-[680px]:gap-0 max-[680px]:px-1',
     isOpen ? 'justify-start gap-3' : 'flex-col justify-center gap-0 text-center',
-    isActive ? 'bg-neutral-800 text-white' : ''
+    isActive ? 'wt-selected' : ''
   ].join(' ')
 }
 
@@ -951,7 +952,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
               onClick={() => sendPlayerCommand({ action: 'toggle-play' })}
               aria-label={playerState.paused ? 'Reproducir' : 'Pausar'}
               title={playerState.paused ? 'Reproducir' : 'Pausar'}
-              className="grid h-9 w-9 cursor-pointer place-items-center rounded bg-neutral-100 text-neutral-950 hover:bg-white"
+              className="wt-action grid h-9 w-9 cursor-pointer place-items-center rounded"
               data-player-control="true"
             >
               <Icon name={playerState.paused ? 'play' : 'pause'} className="h-4 w-4" />

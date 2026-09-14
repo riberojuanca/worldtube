@@ -145,9 +145,9 @@ export function TabBar({ playingIds = [] }: { playingIds?: string[] }) {
       {tabs.map((tab) => {
         const path = tab.entries[tab.index]
         const label = path.startsWith('/watch/') && tab.title !== 'Inicio' ? tab.title : routeTitle(path)
-        return <div key={tab.id} draggable onDragStart={(event) => event.dataTransfer.setData('application/worldtube-tab', tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); reorder(event.dataTransfer.getData('application/worldtube-tab'), tab.id) }} className={`flex h-8 w-48 min-w-28 max-w-48 shrink-0 items-center rounded ${tab.id === activeId ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>
+        return <div key={tab.id} draggable onDragStart={(event) => event.dataTransfer.setData('application/worldtube-tab', tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); reorder(event.dataTransfer.getData('application/worldtube-tab'), tab.id) }} className={`flex h-8 w-48 min-w-28 max-w-48 shrink-0 items-center rounded ${tab.id === activeId ? 'wt-selected' : 'text-neutral-400 hover:bg-neutral-900'}`}>
           <button type="button" role="tab" aria-selected={tab.id === activeId} onClick={() => select(tab.id)} title={label} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 text-left text-xs">
-            {playingIds.includes(tab.id) && <svg aria-label="Reproduciendo" className="h-3 w-3 shrink-0 text-green-400" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 14 8-14 8Z" /></svg>}
+            {playingIds.includes(tab.id) && <svg aria-label="Reproduciendo" className="wt-accent-text h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 14 8-14 8Z" /></svg>}
             <span className="truncate">{label}</span>
           </button>
           <button type="button" onClick={() => close(tab.id)} title="Cerrar pestaña" aria-label={`Cerrar ${label}`} className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded hover:bg-neutral-700"><svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
