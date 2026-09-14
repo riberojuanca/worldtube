@@ -1,0 +1,66 @@
+TITLE
+WorldTube: Open-Source YouTube Desktop Client | Tabs, Mini Player and Local Profiles
+
+VIDEO
+https://youtu.be/ccULEv3KD28
+
+DESCRIPTION
+WorldTube is an AGPL-licensed, local-first desktop video client for Windows and Linux.
+
+This short demo shows:
+
+- Persistent mini player
+- Independent tabs
+- Local profiles and accounts
+- Saved videos and playlists
+- Keyboard shortcuts
+- Live video support
+- Local export and import
+- Automatic update checks
+
+WorldTube is not affiliated with or endorsed by YouTube.
+
+GitHub: https://github.com/riberojuanca/worldtube
+Downloads: https://riberojuanca.github.io/worldtube/
+
+Feedback and bug reports are welcome.
+
+DEMO FOOTAGE
+
+"Keynote: What Winning Open Source Looks Like"
+The Linux Foundation, presented by Chris Wright
+Licensed under Creative Commons Attribution
+Source: PASTE THE VIDEO URL HERE
+
+"CC Cert Webinar: Opening Collections, Managing Risk: A Toolkit for GLAM Institutions"
+Creative Commons Certificate
+Licensed under Creative Commons Attribution
+Source: PASTE THE VIDEO URL HERE
+
+The excerpts were shortened and edited for demonstration purposes.
+
+
+REDDIT POST
+
+I built WorldTube, an AGPL-licensed local-first YouTube desktop client for Windows and Linux.
+
+This short demo shows:
+
+- Persistent mini player
+- Independent tabs
+- Local profiles and accounts
+- Saved videos and playlists
+- Keyboard shortcuts
+- Live video support
+- Local export and import
+- Automatic update checks
+
+I made it because I wanted a more desktop-oriented experience, especially around tabs and persistent playback. It is still an early project, so I would really appreciate feedback about usability, packaging and missing features.
+
+It is not affiliated with or endorsed by YouTube.
+
+Demo: https://youtu.be/ccULEv3KD28
+GitHub: https://github.com/riberojuanca/worldtube
+Downloads: https://riberojuanca.github.io/worldtube/
+
+Feedback, bug reports and suggestions are welcome.
