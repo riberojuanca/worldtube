@@ -2,6 +2,12 @@
 
 ## Delivery Update: 2026-09-14
 
+Initial public release: [v0.0.3](https://github.com/riberojuanca/worldtube/releases/tag/v0.0.3).
+Windows/Linux packaging and publication succeeded. The release includes the
+installers, updater metadata and corresponding-source archive; downloads are
+available at https://riberojuanca.github.io/worldtube/ . macOS is not published.
+The installed update cycle still requires real-device confirmation.
+
 The owner selected AGPL-3.0-only and requested repository/release publication.
 The concrete technical review is complete in .github/DISTRIBUTION_REVIEW.md.
 The old approval-variable steps below are historical and superseded: LICENSE

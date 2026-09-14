@@ -2,6 +2,16 @@
 
 ## Delivery Closure: 2026-09-14
 
+- PUBLIC DELIVERY: v0.0.3 published successfully by run 34802506753. Windows
+  NSIS x64 and Linux AppImage/DEB x64 jobs passed, followed by source archive
+  upload/publication. Latest-release API reports draft=false, nonempty uploaded
+  installers, blockmap and update metadata. Pages and its logo respond HTTP 200.
+- Download entry point: https://riberojuanca.github.io/worldtube/ . macOS has
+  no published installer and remains disabled. Windows installers are unsigned.
+  Real clean-install/update/export-import validation on user devices is not
+  implied by successful CI. The channel-avatar issue reported during search is
+  queued for later, as requested; no additional app feature edits were made.
+
 - v0.0.2 Linux release packaging/upload succeeded. Windows stopped because
   checkout converted reviewed upstream notice files to CRLF, breaking their
   exact-byte receipts. .gitattributes now preserves notices/fonts/icon assets

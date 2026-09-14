@@ -11,6 +11,9 @@ Download installers from the [WorldTube download page](https://riberojuanca.gith
 or [GitHub Releases](https://github.com/riberojuanca/worldtube/releases).
 Downloads become available only after a release is successfully published.
 
+Initial public release: [v0.0.3](https://github.com/riberojuanca/worldtube/releases/tag/v0.0.3),
+with Windows x64 and Linux x64 installers plus corresponding source.
+
 The release configuration prepares Windows NSIS x64 and Linux AppImage/DEB x64.
 macOS DMG/ZIP ARM64 is opt-in and requires signing credentials. See
 [Packaging and Updates](docs/UPDATES.md) for setup and outstanding work.

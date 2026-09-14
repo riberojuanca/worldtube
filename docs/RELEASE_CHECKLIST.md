@@ -2,6 +2,13 @@
 
 ## Current Delivery: 2026-09-14
 
+- PUBLISHED: [WorldTube v0.0.3](https://github.com/riberojuanca/worldtube/releases/tag/v0.0.3).
+  Windows x64 EXE, Linux x64 AppImage/DEB, updater metadata/blockmap and matching
+  corresponding-source archive are public. Both platform packaging jobs and
+  publication passed. Earlier failure notes below are historical, superseded by
+  this result. macOS remains unavailable; Windows installers are unsigned.
+- Successful packaging/publication does not validate a full clean installation,
+  upgrade, export/import migration or updater restart cycle on every platform.
 - Download website is live: https://riberojuanca.github.io/worldtube/ (successful
   Pages workflow and HTTP 200). Linux installers were generated locally with
   expected resources/notices. Windows/Linux release CI failed, so no public
