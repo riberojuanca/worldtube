@@ -2,6 +2,12 @@
 
 ## Delivery Closure: 2026-09-14
 
+- Authorized GitHub CLI session exposed the two exact release failures:
+  Electron's dist/LICENSE was absent in Linux CI, and Windows Corepack setup
+  collided with the preinstalled yarn.cmd shim. CI now explicitly invokes
+  Electron's official installer before notices and allows Corepack to replace
+  conflicting runner shims. Version moves to 0.0.2, preserving the old tag.
+
 - Linux AppImage and DEB generation succeeded locally after exposing Corepack's
   pnpm shim to Builder. No second application compilation was needed. Packaged
   resources include the BotGuard bundle/preload, native esbuild, full notices

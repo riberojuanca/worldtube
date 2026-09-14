@@ -70,9 +70,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --global corepack
+      - run: npm install --global corepack --force
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
+      - name: Ensure Electron runtime and license files are installed
+        run: node node_modules/electron/install.js
       - name: Package and upload to draft
         run: pnpm release --x64
         env:
@@ -94,9 +96,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --global corepack
+      - run: npm install --global corepack --force
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
+      - name: Ensure Electron runtime and license files are installed
+        run: node node_modules/electron/install.js
       - name: Require signing credentials
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
