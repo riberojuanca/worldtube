@@ -60,6 +60,14 @@ async function loadThumbnailsTrack(player: shaka.Player, vtt: string | null): Pr
   }
 }
 
+function addPictureInPictureControl(elements: string[]): string[] {
+  if (elements.includes('picture_in_picture')) return elements
+  const next = [...elements]
+  const fullscreenIndex = next.indexOf('fullscreen')
+  next.splice(fullscreenIndex >= 0 ? fullscreenIndex : next.length, 0, 'picture_in_picture')
+  return next
+}
+
 export const WATCH_SLOT_ID = 'global-player-watch-slot'
 export const MINI_SLOT_ID = 'global-player-mini-slot'
 export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
@@ -80,7 +88,7 @@ export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
  */
 export function GlobalPlayerHost() {
   const { language } = useLocale()
-  const { videoId, dashManifest, liveManifests, sabr, title, captions, storyboardVtt, playVideo, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
+  const { videoId, dashManifest, liveManifests, sabr, title, captions, storyboardVtt, playVideo, playVideoQueue, playbackMode, videoQueue, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
   const location = useLocation()
   const navigate = useNavigate()
   const { activeId: activeTabId } = useAppTabs()
@@ -89,7 +97,8 @@ export function GlobalPlayerHost() {
   const watchSlotId = `${WATCH_SLOT_ID}-${tabId}`
   const miniSlotId = `${MINI_SLOT_ID}-${tabId}`
   const shortsSlotId = `${SHORTS_SLOT_ID}-${tabId}`
-  const isWatchRoute = isTabActive && location.pathname === `/watch/${videoId}`
+  const isWatchPage = location.pathname === `/watch/${videoId}`
+  const isWatchRoute = isTabActive && isWatchPage
   const autoplayAllowedRef = useRef(true)
   const positionsRef = useRef(new Map<string, number>())
   const loadedVideoRef = useRef<string | null>(null)
@@ -126,6 +135,14 @@ export function GlobalPlayerHost() {
   // user navigates to a different video while the reload is still in flight.
   const pendingResumeRef = useRef<{ videoId: string; seconds: number } | null>(null)
 
+  // Elegir otra canción es una acción explícita de reproducción. Reactivamos
+  // el autoplay para esa fuente aunque otra pestaña hubiera pausado esta. Una
+  // recarga SABR del mismo video no reactiva el efecto, por lo que una canción
+  // pausada por el usuario permanece pausada durante esa recarga.
+  useEffect(() => {
+    if (playbackMode === 'music' && videoId) autoplayAllowedRef.current = true
+  }, [playbackMode, videoId])
+
   useLayoutEffect(() => {
     const movePortalMount = (nextTarget: HTMLElement | null) => {
       const target = nextTarget || hiddenHomeRef.current
@@ -140,7 +157,15 @@ export function GlobalPlayerHost() {
       movePortalMount(hiddenHomeRef.current)
       return
     }
-    const watchSlot = isWatchRoute ? document.getElementById(watchSlotId) : null
+    // Keep an inactive tab's player inside its own hidden watch page. Moving
+    // it to the global mini slot made it appear over an unrelated active tab
+    // and could leave Shaka's central control in its replay state when the
+    // owner tab was selected again.
+    if (playbackMode === 'music') {
+      movePortalMount(hiddenHomeRef.current)
+      return
+    }
+    const watchSlot = isWatchPage ? document.getElementById(watchSlotId) : null
     const miniSlot = ownerId === tabId ? document.getElementById(miniSlotId) : null
     const shortSlot = ownerId === tabId && shorts.length > 0 ? document.getElementById(shortsSlotId) : null
     const slot = shortSlot || watchSlot || miniSlot
@@ -148,7 +173,7 @@ export function GlobalPlayerHost() {
       `[player-slot] isWatchRoute=${isWatchRoute} watchSlotFound=${Boolean(watchSlot)} miniSlotFound=${Boolean(miniSlot)} -> using ${slot ? (slot.id || 'hidden-home') : 'hidden-home (no slot found!)'}`
     )
     movePortalMount(slot)
-  }, [isWatchRoute, videoId, location.pathname, portalMount, shorts.length, activeTabId, ownerId, tabId, watchSlotId, miniSlotId, shortsSlotId, revision])
+  }, [isWatchPage, isWatchRoute, videoId, playbackMode, location.pathname, portalMount, shorts.length, activeTabId, ownerId, tabId, watchSlotId, miniSlotId, shortsSlotId, revision])
 
   useEffect(() => {
     return () => portalMount.remove()
@@ -168,7 +193,7 @@ export function GlobalPlayerHost() {
     let disposed = false
     const localPlayer = new shaka.Player()
     const ui = new shaka.ui.Overlay(localPlayer, containerEl, rawVideoEl)
-    fullControlPanelRef.current = [...ui.getConfiguration().controlPanelElements]
+    fullControlPanelRef.current = addPictureInPictureControl(ui.getConfiguration().controlPanelElements)
     const controls = ui.getControls()
     if (!controls) {
       ui.destroy().catch((error: unknown) => console.error(`shaka ui destroy failed: ${JSON.stringify(describeError(error))}`))
@@ -236,12 +261,21 @@ export function GlobalPlayerHost() {
   useEffect(() => {
     const ui = uiRef.current
     if (!ui) return
-    ui.getControls()?.getLocalization().changeLocale([language])
+    ui.getControls()?.getLocalization()?.changeLocale([language])
     ui.configure({
       seekBarColors: { base: 'var(--wt-track)', buffered: 'var(--wt-buffered)', played: 'var(--wt-accent)', adBreaks: 'var(--wt-important)', chapters: 'var(--wt-important)' },
       volumeBarColors: { base: 'var(--wt-track)', level: 'var(--wt-accent)' },
       playbackRateBarColors: { base: 'var(--wt-track)', level: 'var(--wt-accent)' },
-      controlPanelElements: isWatchRoute && shorts.length === 0 ? fullControlPanelRef.current
+      // Electron exposes Document PiP, but that API creates a new renderer
+      // window. Our external-window policy correctly rejects that window and
+      // previously left the system browser on about:blank. Native video PiP
+      // is the intended always-on-top player here.
+      documentPictureInPicture: {
+        enabled: false,
+        preferInitialWindowPlacement: false,
+        disallowReturnToOpener: false
+      },
+      controlPanelElements: isWatchRoute && shorts.length === 0 ? addPictureInPictureControl(fullControlPanelRef.current)
       : ['play_pause', 'mute', 'volume', 'time_and_duration', 'spacer', 'queue', 'overflow_menu', 'fullscreen'] })
   }, [isWatchRoute, shorts.length, rawVideoEl, containerEl, language])
 
@@ -292,6 +326,10 @@ export function GlobalPlayerHost() {
           const index = shorts.findIndex((short) => short.videoId === videoId)
           const targetShort = index >= 0 ? shorts[index + (next ? 1 : -1)] : undefined
           if (targetShort) openShort(targetShort.videoId, shorts)
+        } else if (next && videoQueue.length) {
+          const index = videoQueue.findIndex((video) => video.videoId === videoId)
+          const targetVideo = videoQueue[index + 1]
+          if (targetVideo) { void playVideoQueue(targetVideo.videoId, videoQueue); navigate(`/watch/${targetVideo.videoId}`) }
         } else if (next && relatedVideos[0]) {
           if (isWatchRoute) navigate(`/watch/${relatedVideos[0].videoId}`)
           else void playVideo(relatedVideos[0].videoId)
@@ -338,7 +376,7 @@ export function GlobalPlayerHost() {
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [videoEl, videoId, shorts, openShort, relatedVideos, playVideo, isWatchRoute, navigate, ownerId, tabId, shortsSlotId])
+  }, [videoEl, videoId, shorts, openShort, relatedVideos, playVideo, playVideoQueue, videoQueue, isWatchRoute, navigate, ownerId, tabId, shortsSlotId])
 
   useEffect(() => {
     const player = attachedPlayer
@@ -422,7 +460,8 @@ export function GlobalPlayerHost() {
           if (videoId) {
             autoplayAllowedRef.current = !player.getMediaElement()?.paused
             pendingResumeRef.current = { videoId, seconds: player.getMediaElement()?.currentTime ?? 0 }
-            void playVideo(videoId)
+            if (playbackMode === 'video' && videoQueue.length) void playVideoQueue(videoId, videoQueue)
+            else void playVideo(videoId, playbackMode)
           }
         }
       })
@@ -511,6 +550,21 @@ export function GlobalPlayerHost() {
   }, [videoEl, shorts, videoId, status, openShort])
 
   useEffect(() => {
+    if (!videoEl || playbackMode !== 'video' || shorts.length > 0 || videoQueue.length < 2 || status !== 'ready') return
+    const onEnded = () => {
+      if (!videoEl.ended) return
+      const index = videoQueue.findIndex((video) => video.videoId === videoId)
+      const next = index >= 0 ? videoQueue[index + 1] : undefined
+      if (next) {
+        void playVideoQueue(next.videoId, videoQueue)
+        navigate(`/watch/${next.videoId}`)
+      }
+    }
+    videoEl.addEventListener('ended', onEnded)
+    return () => videoEl.removeEventListener('ended', onEnded)
+  }, [videoEl, playbackMode, shorts.length, videoQueue, videoId, status, playVideoQueue, navigate])
+
+  useEffect(() => {
     if (!videoEl) return
 
     const emitState = () => {
@@ -556,6 +610,11 @@ export function GlobalPlayerHost() {
           videoEl.pause()
         }
         emitState()
+        return
+      }
+
+      if (detail.action === 'toggle-picture-in-picture') {
+        void uiRef.current?.getControls()?.togglePiP()
         return
       }
 
@@ -635,7 +694,7 @@ export function GlobalPlayerHost() {
               <p className="text-sm">{loadError}</p>
               <button
                 type="button"
-                onClick={() => videoId && playVideo(videoId)}
+                onClick={() => videoId && (playbackMode === 'video' && videoQueue.length ? playVideoQueue(videoId, videoQueue) : playVideo(videoId, playbackMode))}
                 className="wt-action rounded px-3 py-1.5 text-sm font-medium"
               >
                 {t("Reintentar")}</button>

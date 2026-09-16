@@ -5,7 +5,7 @@ import { evaluatePlayerScript } from './jsEvaluator'
 import { getHistory, recordHistoryEntry } from './historyStore'
 import { getAppLanguage, listActiveSubscriptions } from './localDb'
 import { translateFor } from '../shared/locale'
-import type { CaptionTrack, ChannelInfoResult, HomeDiscovery, HomeSection, RecommendedChannel, SearchResultItem, VideoInfoResult, VideoPreview } from '../shared/ipc'
+import type { CaptionTrack, ChannelInfoResult, HomeDiscovery, HomeSection, RecommendedChannel, SearchCollectionItem, SearchFilters, SearchResultItem, VideoInfoResult, VideoPreview } from '../shared/ipc'
 
 type VideoOrGridVideo =
   | InstanceType<typeof YTNodes.Video>
@@ -227,6 +227,68 @@ export function mapSearchResultNodes(
   return videos
 }
 
+function mapSearchCollections(nodes: readonly unknown[]): SearchCollectionItem[] {
+  const collections: SearchCollectionItem[] = []
+  for (const node of nodes) {
+    if (node instanceof YTNodes.Playlist || node instanceof YTNodes.GridPlaylist) {
+      collections.push({
+        collectionId: node.id,
+        kind: 'playlist',
+        title: node.title.toString(),
+        channelId: node.author instanceof Object && 'id' in node.author ? String(node.author.id ?? '') || null : null,
+        channelName: node.author?.toString() ?? '(unknown)',
+        thumbnailUrl: node.thumbnails[0]?.url ?? null,
+        itemCountText: node.video_count?.toString() ?? null
+      })
+      continue
+    }
+    if (!(node instanceof YTNodes.LockupView) || !['PLAYLIST', 'ALBUM', 'PODCAST'].includes(node.content_type)) continue
+    const metadata = getLockupMetadataRows(node).flatMap((row) => row.metadata_parts ?? [])
+    const channelId = getLockupChannelId(node)
+    collections.push({
+      collectionId: node.content_id,
+      kind: node.content_type === 'ALBUM' ? 'album' : node.content_type === 'PODCAST' ? 'podcast' : 'playlist',
+      title: node.metadata?.title?.toString() ?? translateFor(getAppLanguage(), '(untitled)'),
+      channelId,
+      channelName: getLockupChannelName(node, metadata.map((part) => textValue(part.text)).find(Boolean) ?? '(unknown)'),
+      thumbnailUrl: getLockupThumbnailUrl(node),
+      itemCountText: metadata.map((part) => textValue(part.text)).find((text) => text && /\d+\s+(videos?|songs?|episodes?)/iu.test(text)) ?? null
+    })
+  }
+  return [...new Map(collections.map((item) => [`${item.kind}:${item.collectionId}`, item])).values()]
+}
+
+function mapMusicCollections(items: readonly InstanceType<typeof YTNodes.MusicResponsiveListItem>[], kind: 'album' | 'playlist'): SearchCollectionItem[] {
+  return items.flatMap((item) => item.id && item.title ? [{
+    collectionId: item.id,
+    kind,
+    title: item.title,
+    channelId: item.author?.channel_id ?? null,
+    channelName: item.author?.name ?? '(unknown)',
+    thumbnailUrl: item.thumbnails[0]?.url ?? null,
+    itemCountText: item.item_count ?? item.year ?? null
+  }] : [])
+}
+
+function mapPlaylistItems(items: readonly unknown[], fallbackName = '(unknown)'): SearchResultItem[] {
+  const videos: SearchResultItem[] = []
+  for (const item of items) {
+    if (item instanceof YTNodes.PlaylistVideo && item.is_playable) {
+      videos.push({ videoId: item.id, title: item.title.toString(), channelId: item.author?.id ?? null,
+        channelName: item.author?.name ?? fallbackName, thumbnailUrl: item.thumbnails[0]?.url ?? null,
+        durationText: item.duration?.text ?? null, viewCountText: null, publishedText: item.video_info?.toString() ?? null })
+    } else if (item instanceof YTNodes.MusicResponsiveListItem && item.id && ['song', 'video', 'non_music_track'].includes(item.item_type ?? '')) {
+      const author = item.artists?.[0] ?? item.authors?.[0]
+      videos.push({ videoId: item.id, title: item.title ?? '(untitled)', channelId: author?.channel_id ?? null,
+        channelName: author?.name ?? fallbackName, thumbnailUrl: item.thumbnails[0]?.url ?? null,
+        durationText: item.duration?.text ?? null, viewCountText: item.views ?? null, publishedText: null })
+    } else {
+      videos.push(...mapSearchResultNodes([item], null, fallbackName))
+    }
+  }
+  return [...new Map(videos.map((video) => [video.videoId, video])).values()]
+}
+
 function mapWatchNextFeed(nodes: readonly unknown[]): SearchResultItem[] {
   return mapSearchResultNodes(nodes)
 }
@@ -346,19 +408,50 @@ export function fetchVideoInfo(videoId: string): Promise<VideoInfoResult> {
   return promise
 }
 
-export async function searchVideos(query: string): Promise<{ videos: SearchResultItem[]; channels: RecommendedChannel[] }> {
+export async function searchVideos(query: string, filters?: SearchFilters): Promise<{ videos: SearchResultItem[]; channels: RecommendedChannel[]; collections: SearchCollectionItem[] }> {
   console.log(`[youtube] searchVideos(${query})`)
   const yt = await getClient()
-  const results = await yt.search(query)
-  const channelNodes = results.channels.length ? results.channels :
-    (await yt.search(query, { type: 'channel' }).catch(() => null))?.channels ?? []
+  const type = filters?.type ?? 'all'
+  if (type === 'albums') {
+    const music = await yt.music.search(query, { type: 'album' })
+    return { videos: [], channels: [], collections: mapMusicCollections(music.albums?.contents ?? [], 'album') }
+  }
+  const searchOptions: NonNullable<Parameters<Innertube['search']>[1]> = {
+    type: type === 'videos' || type === 'live' ? 'video' : type === 'shorts' ? 'shorts'
+      : type === 'channels' ? 'channel' : type === 'playlists' || type === 'podcasts' ? 'playlist' : 'all',
+    upload_date: filters?.uploadDate ?? 'all',
+    duration: filters?.duration === 'short' ? 'under_three_mins' : filters?.duration === 'medium' ? 'three_to_twenty_mins'
+      : filters?.duration === 'long' ? 'over_twenty_mins' : 'all',
+    prioritize: filters?.sort ?? 'relevance',
+    features: type === 'live' ? ['live'] : undefined
+  }
+  const results = await yt.search(query, searchOptions)
+  const channelNodes = type === 'all' || type === 'channels'
+    ? results.channels.length ? results.channels : (await yt.search(query, { type: 'channel' }).catch(() => null))?.channels ?? []
+    : []
   const channels = channelNodes.map((channel) => ({
     channelId: channel.id, name: channel.author.name,
     thumbnailUrl: channel.author.best_thumbnail?.url ?? null,
     subscriberCountText: channel instanceof YTNodes.Channel ? channel.subscriber_count?.toString() ?? null : channel.subscribers?.toString() ?? null,
     description: channel instanceof YTNodes.Channel ? channel.description_snippet?.toString() ?? null : null
   }))
-  return { videos: await resolveChannelNames(mapSearchResultNodes(results.videos)), channels }
+  const collections = mapSearchCollections(results.results).filter((item) => type !== 'podcasts' || item.kind === 'podcast')
+  const videos = ['channels', 'playlists', 'albums', 'podcasts'].includes(type) ? [] : mapSearchResultNodes(results.results)
+  return { videos: await resolveChannelNames(videos), channels, collections }
+}
+
+export async function getCollectionVideos(collectionId: string, kind: SearchCollectionItem['kind']): Promise<SearchResultItem[]> {
+  const yt = await getClient()
+  if (kind === 'album' || collectionId.startsWith('MP')) {
+    if (kind === 'album') {
+      const album = await yt.music.getAlbum(collectionId)
+      return mapPlaylistItems(album.contents)
+    }
+    const playlist = await yt.music.getPlaylist(collectionId)
+    return mapPlaylistItems(playlist.items)
+  }
+  const playlist = await yt.getPlaylist(collectionId)
+  return mapPlaylistItems(playlist.items, playlist.info.author?.name ?? '(unknown)')
 }
 
 export async function getSearchSuggestions(query: string): Promise<string[]> {

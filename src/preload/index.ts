@@ -4,6 +4,8 @@ import type { AppPreferences } from '../shared/locale'
 import type { UpdateState } from '../shared/ipc'
 import type {
   ChannelResponse,
+  CollectionRequest,
+  CollectionResponse,
   PlayerAudioPreferences,
   ChannelPageRequest,
   ChannelPageResponse,
@@ -13,11 +15,13 @@ import type {
   CreateSavedPlaylistRequest,
   HistoryEntry,
   LocalSessionState,
+  LibraryKind,
   LoginLocalUserRequest,
   ProfilesState,
   SaveVideoRequest,
   SearchHistoryEntry,
   SearchRequest,
+  SearchFilters,
   SearchResponse,
   SearchSuggestionsResponse,
   SavedPlaylist,
@@ -45,8 +49,9 @@ const api = {
   setPlayerAudioPreferences: (audio: PlayerAudioPreferences): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.PLAYER_AUDIO_SET, audio),
   getVideoInfo: (videoId: string): Promise<VideoInfoResponse> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_VIDEO_INFO, { videoId } satisfies VideoInfoRequest),
-  search: (query: string): Promise<SearchResponse> =>
-    ipcRenderer.invoke(IPC_CHANNELS.SEARCH, { query } satisfies SearchRequest),
+  search: (query: string, filters?: SearchFilters): Promise<SearchResponse> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SEARCH, { query, filters } satisfies SearchRequest),
+  getCollection: (request: CollectionRequest): Promise<CollectionResponse> => ipcRenderer.invoke(IPC_CHANNELS.GET_COLLECTION, request),
   getSearchSuggestions: (query: string): Promise<SearchSuggestionsResponse> =>
     ipcRenderer.invoke(IPC_CHANNELS.SEARCH_SUGGESTIONS, { query } satisfies SearchRequest),
   getChannel: (channelId: string): Promise<ChannelResponse> => ipcRenderer.invoke(IPC_CHANNELS.GET_CHANNEL, { channelId }),
@@ -67,13 +72,13 @@ const api = {
   removeProfile: (profileId: string): Promise<ProfilesState> => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_REMOVE, profileId),
   getHistory: (): Promise<HistoryEntry[]> => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_LIST),
   clearHistory: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_CLEAR),
-  listSavedPlaylists: (): Promise<SavedPlaylist[]> => ipcRenderer.invoke(IPC_CHANNELS.SAVED_PLAYLISTS_LIST),
+  listSavedPlaylists: (library?: LibraryKind): Promise<SavedPlaylist[]> => ipcRenderer.invoke(IPC_CHANNELS.SAVED_PLAYLISTS_LIST, library),
   createSavedPlaylist: (request: CreateSavedPlaylistRequest): Promise<SavedPlaylist> =>
     ipcRenderer.invoke(IPC_CHANNELS.SAVED_PLAYLISTS_CREATE, request),
-  listSavedVideos: (playlistId?: string | null): Promise<SavedVideo[]> => ipcRenderer.invoke(IPC_CHANNELS.SAVED_VIDEOS_LIST, playlistId),
+  listSavedVideos: (playlistId?: string | null, library?: LibraryKind): Promise<SavedVideo[]> => ipcRenderer.invoke(IPC_CHANNELS.SAVED_VIDEOS_LIST, playlistId, library),
   saveVideo: (request: SaveVideoRequest): Promise<SavedVideo> => ipcRenderer.invoke(IPC_CHANNELS.SAVED_VIDEOS_SAVE, request),
-  removeSavedVideo: (videoId: string, playlistId?: string | null): Promise<void> =>
-    ipcRenderer.invoke(IPC_CHANNELS.SAVED_VIDEOS_REMOVE, videoId, playlistId),
+  removeSavedVideo: (videoId: string, playlistId?: string | null, library?: LibraryKind): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SAVED_VIDEOS_REMOVE, videoId, playlistId, library),
   listSearchHistory: (): Promise<SearchHistoryEntry[]> => ipcRenderer.invoke(IPC_CHANNELS.SEARCH_HISTORY_LIST),
   recordSearchQuery: (query: string): Promise<SearchHistoryEntry[]> => ipcRenderer.invoke(IPC_CHANNELS.SEARCH_HISTORY_RECORD, query),
   listSubscriptions: (): Promise<Subscription[]> => ipcRenderer.invoke(IPC_CHANNELS.SUBSCRIPTIONS_LIST),

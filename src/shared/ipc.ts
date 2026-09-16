@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   GET_VIDEO_INFO: 'youtube:get-video-info',
   GET_VIDEO_PREVIEW: 'youtube:get-video-preview',
   SEARCH: 'youtube:search',
+  GET_COLLECTION: 'youtube:get-collection',
   SEARCH_SUGGESTIONS: 'youtube:search-suggestions',
   GET_CHANNEL: 'youtube:get-channel',
   CHANNEL_PAGE: 'youtube:channel-page',
@@ -70,11 +71,14 @@ export interface UserProfile {
   updatedAt: number
 }
 
+export type LibraryKind = 'video' | 'music'
+
 export interface SavedPlaylist {
   id: string
   profileId: string
   name: string
   description: string | null
+  library: LibraryKind
   createdAt: number
   updatedAt: number
 }
@@ -88,6 +92,7 @@ export interface SavedVideo {
   channelName: string
   thumbnailUrl: string | null
   playlistId: string | null
+  library: LibraryKind
   savedAt: number
 }
 
@@ -98,11 +103,13 @@ export interface SaveVideoRequest {
   channelName: string
   thumbnailUrl: string | null
   playlistId: string | null
+  library?: LibraryKind
 }
 
 export interface CreateSavedPlaylistRequest {
   name: string
   description?: string | null
+  library?: LibraryKind
 }
 
 export interface SearchHistoryEntry {
@@ -184,6 +191,34 @@ export interface VideoInfoRequest {
 
 export interface SearchRequest {
   query: string
+  filters?: SearchFilters
+}
+
+export type SearchResultType = 'all' | 'videos' | 'shorts' | 'live' | 'channels' | 'playlists' | 'albums' | 'podcasts'
+export type SearchUploadDate = 'all' | 'today' | 'week' | 'month' | 'year'
+export type SearchDuration = 'all' | 'short' | 'medium' | 'long'
+export type SearchSort = 'relevance' | 'popularity'
+
+export interface SearchFilters {
+  type: SearchResultType
+  uploadDate: SearchUploadDate
+  duration: SearchDuration
+  sort: SearchSort
+}
+
+export interface SearchCollectionItem {
+  collectionId: string
+  kind: 'playlist' | 'album' | 'podcast'
+  title: string
+  channelId: string | null
+  channelName: string
+  thumbnailUrl: string | null
+  itemCountText: string | null
+}
+
+export interface CollectionRequest {
+  collectionId: string
+  kind: SearchCollectionItem['kind']
 }
 
 export interface SearchResultItem {
@@ -232,7 +267,9 @@ export interface HomeDiscovery {
   channels: RecommendedChannel[]
 }
 
-export type SearchResponse = { ok: true; data: SearchResultItem[]; channels?: RecommendedChannel[]; home?: HomeDiscovery } | { ok: false; error: string }
+export type SearchResponse = { ok: true; data: SearchResultItem[]; channels?: RecommendedChannel[]; collections?: SearchCollectionItem[]; home?: HomeDiscovery } | { ok: false; error: string }
+
+export type CollectionResponse = { ok: true; data: SearchResultItem[] } | { ok: false; error: string }
 
 export type SearchSuggestionsResponse = { ok: true; data: string[] } | { ok: false; error: string }
 

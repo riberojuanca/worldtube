@@ -1,4 +1,4 @@
-type NavigationIconName = 'home' | 'subscriptions' | 'history' | 'saved' | 'playlists' | 'account'
+type NavigationIconName = 'home' | 'subscriptions' | 'history' | 'saved' | 'playlists' | 'music' | 'account'
 
 const symbols: Record<NavigationIconName, JSX.Element> = {
   home: <>
@@ -26,6 +26,11 @@ const symbols: Record<NavigationIconName, JSX.Element> = {
     <rect x="2" y="16" width="3" height="3" rx="1" />
     <rect x="7" y="16" width="6" height="3" rx="1" opacity=".45" />
     <path d="m17 15 6 3.5-6 3.5Z" />
+  </>,
+  music: <>
+    <path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="17" cy="16" r="3" />
   </>,
   account: <>
     <path fillRule="evenodd" d="M5 2h14a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Zm0 3v14h14V5H5Z" opacity=".65" />

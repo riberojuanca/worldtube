@@ -1,5 +1,7 @@
 import type {
   ChannelResponse,
+  CollectionRequest,
+  CollectionResponse,
   PlayerAudioPreferences,
   ChannelPageRequest,
   ChannelPageResponse,
@@ -9,12 +11,14 @@ import type {
   CreateSavedPlaylistRequest,
   HistoryEntry,
   LocalSessionState,
+  LibraryKind,
   LoginLocalUserRequest,
   ProfilesState,
   SaveVideoRequest,
   SavedPlaylist,
   SavedVideo,
   SearchHistoryEntry,
+  SearchFilters,
   SearchResponse,
   SearchSuggestionsResponse,
   Subscription,
@@ -36,7 +40,8 @@ declare global {
       getPlayerAudioPreferences: () => Promise<PlayerAudioPreferences>
       setPlayerAudioPreferences: (audio: PlayerAudioPreferences) => Promise<void>
       getVideoInfo: (videoId: string) => Promise<VideoInfoResponse>
-      search: (query: string) => Promise<SearchResponse>
+      search: (query: string, filters?: SearchFilters) => Promise<SearchResponse>
+      getCollection: (request: CollectionRequest) => Promise<CollectionResponse>
       getSearchSuggestions: (query: string) => Promise<SearchSuggestionsResponse>
       getChannel: (channelId: string) => Promise<ChannelResponse>
       getChannelPage: (request: ChannelPageRequest) => Promise<ChannelPageResponse>
@@ -55,11 +60,11 @@ declare global {
       removeProfile: (profileId: string) => Promise<ProfilesState>
       getHistory: () => Promise<HistoryEntry[]>
       clearHistory: () => Promise<void>
-      listSavedPlaylists: () => Promise<SavedPlaylist[]>
+      listSavedPlaylists: (library?: LibraryKind) => Promise<SavedPlaylist[]>
       createSavedPlaylist: (request: CreateSavedPlaylistRequest) => Promise<SavedPlaylist>
-      listSavedVideos: (playlistId?: string | null) => Promise<SavedVideo[]>
+      listSavedVideos: (playlistId?: string | null, library?: LibraryKind) => Promise<SavedVideo[]>
       saveVideo: (request: SaveVideoRequest) => Promise<SavedVideo>
-      removeSavedVideo: (videoId: string, playlistId?: string | null) => Promise<void>
+      removeSavedVideo: (videoId: string, playlistId?: string | null, library?: LibraryKind) => Promise<void>
       listSearchHistory: () => Promise<SearchHistoryEntry[]>
       recordSearchQuery: (query: string) => Promise<SearchHistoryEntry[]>
       listSubscriptions: () => Promise<Subscription[]>

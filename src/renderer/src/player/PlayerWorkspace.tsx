@@ -12,7 +12,7 @@ interface WorkspaceValue {
 }
 const WorkspaceContext = createContext<WorkspaceValue | null>(null)
 const emptyPlayer: GlobalPlayerContextValue = {
-  ...initialState, ownerTabId: '', shorts: [], playVideo: async () => {},
+  ...initialState, ownerTabId: '', playbackMode: 'video', musicQueue: [], musicSourcePath: null, videoQueue: [], shorts: [], playVideo: async () => {}, playVideoQueue: async () => {}, playMusic: async () => {},
   closePlayer: () => {}, openShort: () => {}, dismissShorts: () => {}
 }
 

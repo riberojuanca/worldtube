@@ -12,6 +12,7 @@ import {
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { GlobalPlayerProvider, useGlobalPlayer } from './player/GlobalPlayerContext'
 import { GlobalPlayerHost, MINI_SLOT_ID } from './player/GlobalPlayerHost'
+import { MusicMiniPlayer } from './player/MusicPlayer'
 import { ShortsModal } from './player/ShortsModal'
 import { PLAYER_COMMAND_EVENT, PLAYER_STATE_EVENT, type PlayerCommandDetail, type PlayerStateDetail } from './player/events'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -22,8 +23,10 @@ import { UpdateNotice } from './components/ApplicationSettings'
 import { ProfileProvider, useProfiles } from './profiles/ProfileContext'
 import { PROFILE_DATA_CHANGED_EVENT } from './profiles/events'
 import { Channel } from './pages/Channel'
+import { Collection } from './pages/Collection'
 import { History } from './pages/History'
 import { Home } from './pages/Home'
+import { Music } from './pages/Music'
 import { Account } from './pages/Account'
 import { Playlists } from './pages/Playlists'
 import { Saved } from './pages/Saved'
@@ -43,6 +46,7 @@ type IconName =
   | 'forward10'
   | 'history'
   | 'pause'
+  | 'pictureInPicture'
   | 'play'
   | 'replay10'
   | 'rewind'
@@ -70,6 +74,7 @@ function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: str
     ),
     history: <path d="M12 8v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v5h5" />,
     pause: <path d="M8 5v14M16 5v14" />,
+    pictureInPicture: <><rect x="3" y="5" width="18" height="14" rx="2" /><rect x="11" y="11" width="7" height="5" rx="1" /></>,
     play: <path d="m8 5 11 7-11 7V5Z" />,
     replay10: (
       <>
@@ -613,6 +618,12 @@ function SideNav({ isOpen }: { isOpen: boolean }) {
           </span>
           <span className={isOpen ? 'text-sm max-[680px]:text-[11px]' : 'text-[11px]'}>{t("Playlists")}</span>
         </NavLink>
+        <NavLink to="/music" className={({ isActive }) => navClass(isOpen, isActive)} title={t("Music")}>
+          <span className="grid h-9 w-9 shrink-0 place-items-center">
+            <NavigationIcon name="music" />
+          </span>
+          <span className={isOpen ? 'text-sm max-[680px]:text-[11px]' : 'text-[11px]'}>{t("Music")}</span>
+        </NavLink>
 
         {subscriptions.length > 0 && (
           <>
@@ -668,7 +679,7 @@ function isRangeControlTarget(target: EventTarget | null): boolean {
 
 function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
   useLocale()
-  const { videoId, title, channelName, closePlayer, shorts, ownerTabId } = useGlobalPlayer()
+  const { videoId, title, channelName, closePlayer, playbackMode, shorts, ownerTabId } = useGlobalPlayer()
   const { activeId, select, navigatorFor, tabs: tabsForMini } = useAppTabs()
   function returnToWatch() {
     select(ownerTabId)
@@ -910,9 +921,9 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
       miniSurface?.removeEventListener('pointerdown', handleMiniPointerDown)
       minimizedSurface?.removeEventListener('pointerdown', handleMinimizedPointerDown)
     }
-  }, [videoId, isMinimized])
+  }, [videoId, isMinimized, isWatchRoute, shorts.length, activeId, ownerTabId])
 
-  if (videoId === null || isWatchRoute || shorts.length > 0) return null
+  if (videoId === null || playbackMode === 'music' || activeId !== ownerTabId || isWatchRoute || shorts.length > 0) return null
 
   const showBar = (isMinimized || isMinimizePreview) && !isRestorePreview
   const hideMini = (isMinimized || isMinimizePreview) && !isRestorePreview
@@ -1072,6 +1083,16 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
           <div className="flex items-center pr-2">
             <button
               type="button"
+              onClick={() => sendPlayerCommand({ action: 'toggle-picture-in-picture' })}
+              aria-label={t("Imagen en imagen")}
+              title={t("Imagen en imagen")}
+              className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              data-player-control="true"
+            >
+              <Icon name="pictureInPicture" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setIsMinimized(true)
                 setIsMinimizePreview(false)
@@ -1116,9 +1137,11 @@ function AppRoutes() {
         <Route path="/subscriptions" element={<Subscriptions />} />
         <Route path="/saved" element={<Saved />} />
         <Route path="/playlists" element={<Playlists />} />
+        <Route path="/music" element={<Music />} />
         <Route path="/profile" element={<Navigate to="/saved" replace />} />
         <Route path="/account" element={<Account />} />
         <Route path="/channel/:channelId" element={<Channel />} />
+        <Route path="/collection/:kind/:collectionId" element={<Collection />} />
         <Route path="/watch/:videoId" element={<Watch />} />
       </Routes>
     </ErrorBoundary>
@@ -1142,6 +1165,7 @@ export default function App() {
             </main>
           </div>
           <MiniPlayer isSideNavOpen={isSideNavOpen} />
+          <MusicMiniPlayer />
           <ShortsModal />
           <UpdateNotice />
         </div></TabLinkHandler>

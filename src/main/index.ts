@@ -5,11 +5,14 @@ import { translateFor } from '../shared/locale'
 import { registerUpdates, checkForUpdatesOnStartup } from './updates'
 import type {
   ChannelResponse,
+  CollectionRequest,
+  CollectionResponse,
   CreateLocalUserRequest,
   DeleteLocalUserRequest,
   CreateProfileRequest,
   CreateSavedPlaylistRequest,
   LocalSessionState,
+  LibraryKind,
   LoginLocalUserRequest,
   ProfilesState,
   SaveVideoRequest,
@@ -21,7 +24,7 @@ import type {
   VideoInfoRequest,
   VideoInfoResponse
 } from '../shared/ipc'
-import { fetchVideoInfo, getChannelInfo, getHomeDiscovery, getSearchSuggestions, getSubscriptionsFeed, getVideoPreview, searchVideos } from './youtube'
+import { fetchVideoInfo, getChannelInfo, getCollectionVideos, getHomeDiscovery, getSearchSuggestions, getSubscriptionsFeed, getVideoPreview, searchVideos } from './youtube'
 import { getChannelPage } from './channelBrowse'
 import type { ChannelPageRequest, ChannelPageResponse } from '../shared/ipc'
 import { clearHistory, getHistory } from './historyStore'
@@ -51,6 +54,16 @@ import {
   updateUserProfile
 } from './localDb'
 import { addSubscription, listSubscriptions, removeSubscription } from './subscriptionsStore'
+
+// AppImage launches do not always keep stdout/stderr attached. Node emits an
+// EPIPE error when a later console call writes to a closed launcher pipe; if
+// nobody handles it, the Electron main process exits. Logging must never make
+// the application crash.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code !== 'EPIPE') throw error
+  })
+}
 
 // Keep the data directory identical in development and packaged installations.
 app.setName('worldtube')
@@ -119,7 +132,9 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // Internal/blank windows (including Document PiP) must never be forwarded
+    // to the user's browser. Only real web links are external navigation.
+    if (/^https?:\/\//i.test(details.url)) void shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
@@ -144,13 +159,21 @@ ipcMain.handle(
 
 ipcMain.handle(IPC_CHANNELS.GET_VIDEO_PREVIEW, (_event, videoId: string) => getVideoPreview(videoId))
 
-ipcMain.handle(IPC_CHANNELS.SEARCH, async (_event, { query }: SearchRequest): Promise<SearchResponse> => {
+ipcMain.handle(IPC_CHANNELS.SEARCH, async (_event, { query, filters }: SearchRequest): Promise<SearchResponse> => {
   try {
     await recordActiveSearchQuery(query).catch((error) => {
       console.warn('[search-history] failed to record query', error)
     })
-    const data = await searchVideos(query)
-    return { ok: true, data: data.videos, channels: data.channels }
+    const data = await searchVideos(query, filters)
+    return { ok: true, data: data.videos, channels: data.channels, collections: data.collections }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle(IPC_CHANNELS.GET_COLLECTION, async (_event, request: CollectionRequest): Promise<CollectionResponse> => {
+  try {
+    return { ok: true, data: await getCollectionVideos(request.collectionId, request.kind) }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -235,12 +258,12 @@ ipcMain.handle(IPC_CHANNELS.PROFILES_REMOVE, (_event, profileId: string): Promis
 ipcMain.handle(IPC_CHANNELS.HISTORY_LIST, () => getHistory())
 ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, () => clearHistory())
 
-ipcMain.handle(IPC_CHANNELS.SAVED_PLAYLISTS_LIST, () => listActiveSavedPlaylists())
+ipcMain.handle(IPC_CHANNELS.SAVED_PLAYLISTS_LIST, (_event, library?: LibraryKind) => listActiveSavedPlaylists(library))
 ipcMain.handle(IPC_CHANNELS.SAVED_PLAYLISTS_CREATE, (_event, request: CreateSavedPlaylistRequest) => createActiveSavedPlaylist(request))
-ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_LIST, (_event, playlistId?: string | null) => listActiveSavedVideos(playlistId))
+ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_LIST, (_event, playlistId?: string | null, library?: LibraryKind) => listActiveSavedVideos(playlistId, library))
 ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_SAVE, (_event, request: SaveVideoRequest) => saveActiveVideo(request))
-ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_REMOVE, (_event, videoId: string, playlistId?: string | null) =>
-  removeActiveSavedVideo(videoId, playlistId)
+ipcMain.handle(IPC_CHANNELS.SAVED_VIDEOS_REMOVE, (_event, videoId: string, playlistId?: string | null, library?: LibraryKind) =>
+  removeActiveSavedVideo(videoId, playlistId, library)
 )
 ipcMain.handle(IPC_CHANNELS.SEARCH_HISTORY_LIST, () => listActiveSearchHistory())
 ipcMain.handle(IPC_CHANNELS.SEARCH_HISTORY_RECORD, (_event, query: string) => recordActiveSearchQuery(query))

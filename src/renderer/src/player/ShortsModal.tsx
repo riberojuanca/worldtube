@@ -1,7 +1,7 @@
 import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { VideoSaveButton } from '../components/VideoSaveButton'
+import { VideoSaveActions } from '../components/VideoSaveButton'
 import { VideoThumbnail } from '../components/VideoCard'
 import { SHORTS_SLOT_ID } from './GlobalPlayerHost'
 import { useGlobalPlayer } from './GlobalPlayerContext'
@@ -107,12 +107,7 @@ export function ShortsModal() {
       <button type="button" onClick={() => move(1)} disabled={index < 0 || index >= shorts.length - 1 || Boolean(slide)} aria-label={t("Siguiente Short")} title={t("Siguiente")}
         className="grid h-9 w-9 place-items-center rounded bg-neutral-800 text-lg hover:bg-neutral-700 disabled:cursor-default disabled:opacity-30">{'\u2193'}</button>
       </div>
-      {short && <div className="flex flex-col gap-3">
-        <VideoSaveButton key={`saved-${short.videoId}`} mode="saved" className="relative" buttonClassName="grid h-9 w-9 place-items-center rounded bg-neutral-800 text-sm hover:bg-neutral-700 disabled:opacity-40"
-          video={{ ...short, playlistId: null }} />
-        <VideoSaveButton key={`playlists-${short.videoId}`} mode="playlists" className="relative" menuPosition="above" buttonClassName="grid h-9 w-9 place-items-center rounded bg-neutral-800 text-sm hover:bg-neutral-700"
-          video={{ ...short, playlistId: null }} />
-      </div>}
+      {short && <VideoSaveActions key={`save-${short.videoId}`} buttonClassName="grid h-9 w-9 place-items-center rounded bg-neutral-800 text-sm hover:bg-neutral-700 disabled:opacity-40" video={{ ...short, playlistId: null }} />}
     </div>
   </dialog>
 }

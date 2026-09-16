@@ -140,8 +140,8 @@ export function TabPages({ children }: { children: ReactNode }) {
 
 function routeTitle(path: string) {
   if (path.startsWith('/search')) return new URLSearchParams(parsePath(path).search).get('q') || t("Buscar")
-  const labels: Record<string, string> = { '/': t("Inicio"), '/saved': t("Guardados"), '/playlists': t("Playlists"), '/account': t("Cuenta"), '/history': t("Historial"), '/subscriptions': t("Suscripciones") }
-  return labels[path] || (path.startsWith('/channel') ? t("Canal") : 'Video')
+  const labels: Record<string, string> = { '/': t("Inicio"), '/saved': t("Guardados"), '/playlists': t("Playlists"), '/music': t("Music"), '/account': t("Cuenta"), '/history': t("Historial"), '/subscriptions': t("Suscripciones") }
+  return labels[path] || (path.startsWith('/channel') ? t("Canal") : path.startsWith('/collection') ? t("Colección") : 'Video')
 }
 
 export function TabBar({ playingIds = [] }: { playingIds?: string[] }) {

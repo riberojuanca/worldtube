@@ -2,6 +2,16 @@ import { t, useLocale } from '../i18n/LocaleContext'
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CaptionTrack, SabrManifestInfo, SabrStreamInfo, SearchResultItem, VideoInfoResult } from '../../../shared/ipc'
 
+export type PlaybackMode = 'video' | 'music'
+export interface MusicQueueItem {
+  id: string
+  videoId: string
+  title: string
+  channelId: string | null
+  channelName: string
+  thumbnailUrl: string | null
+}
+
 export interface GlobalPlayerState {
   videoId: string | null
   title: string
@@ -28,7 +38,13 @@ export interface GlobalPlayerState {
 
 export interface GlobalPlayerContextValue extends GlobalPlayerState {
   ownerTabId: string
-  playVideo: (videoId: string) => Promise<void>
+  playbackMode: PlaybackMode
+  musicQueue: MusicQueueItem[]
+  musicSourcePath: string | null
+  videoQueue: SearchResultItem[]
+  playVideo: (videoId: string, mode?: PlaybackMode) => Promise<void>
+  playVideoQueue: (videoId: string, queue: SearchResultItem[]) => Promise<void>
+  playMusic: (videoId: string, queue: MusicQueueItem[], sourcePath?: string) => Promise<void>
   closePlayer: () => void
   shorts: SearchResultItem[]
   openShort: (videoId: string, videos: SearchResultItem[]) => void
@@ -65,6 +81,10 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   useLocale()
   const [state, setState] = useState<GlobalPlayerState>(initialState)
   const [shorts, setShorts] = useState<SearchResultItem[]>([])
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('video')
+  const [musicQueue, setMusicQueue] = useState<MusicQueueItem[]>([])
+  const [musicSourcePath, setMusicSourcePath] = useState<string | null>(null)
+  const [videoQueue, setVideoQueue] = useState<SearchResultItem[]>([])
 
   // Guards against a stale response winning a race if the user jumps to a
   // second video before the first `getVideoInfo` call has resolved.
@@ -77,7 +97,9 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   // at once and they started stepping on each other's requests.
   const inFlightVideoIdRef = useRef<string | null>(null)
 
-  const playVideo = useCallback(async (videoId: string) => {
+  const playVideo = useCallback(async (videoId: string, mode: PlaybackMode = 'video') => {
+    setPlaybackMode(mode)
+    if (mode === 'video') { setMusicQueue([]); setMusicSourcePath(null); setVideoQueue([]) }
     if (inFlightVideoIdRef.current === videoId) return
     inFlightVideoIdRef.current = videoId
 
@@ -93,6 +115,24 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
       }
     }
   }, [])
+
+  const playVideoQueue = useCallback(async (videoId: string, queue: SearchResultItem[]) => {
+    setPlaybackMode('video')
+    setMusicQueue([])
+    setMusicSourcePath(null)
+    setVideoQueue(queue)
+    if (inFlightVideoIdRef.current === videoId) return
+    inFlightVideoIdRef.current = videoId
+    try { await playVideoImpl(videoId) }
+    finally { if (inFlightVideoIdRef.current === videoId) inFlightVideoIdRef.current = null }
+  }, [])
+
+  const playMusic = useCallback(async (videoId: string, queue: MusicQueueItem[], sourcePath?: string) => {
+    setMusicQueue(queue)
+    setVideoQueue([])
+    if (sourcePath) setMusicSourcePath(sourcePath)
+    await playVideo(videoId, 'music')
+  }, [playVideo])
 
   const playVideoImpl = useCallback(async (videoId: string) => {
     const requestId = ++requestIdRef.current
@@ -163,6 +203,10 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
     requestIdRef.current++
     inFlightVideoIdRef.current = null
     setShorts([])
+    setPlaybackMode('video')
+    setMusicQueue([])
+    setMusicSourcePath(null)
+    setVideoQueue([])
     setState(initialState)
   }, [])
 
@@ -175,8 +219,8 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   const dismissShorts = useCallback(() => setShorts([]), [])
 
   const value = useMemo<GlobalPlayerContextValue>(
-    () => ({ ...state, ownerTabId: tabId, playVideo, closePlayer, shorts, openShort, dismissShorts }),
-    [state, tabId, playVideo, closePlayer, shorts, openShort, dismissShorts]
+    () => ({ ...state, ownerTabId: tabId, playbackMode, musicQueue, musicSourcePath, videoQueue, playVideo, playVideoQueue, playMusic, closePlayer, shorts, openShort, dismissShorts }),
+    [state, tabId, playbackMode, musicQueue, musicSourcePath, videoQueue, playVideo, playVideoQueue, playMusic, closePlayer, shorts, openShort, dismissShorts]
   )
 
   return <GlobalPlayerContext.Provider value={value}>{children}</GlobalPlayerContext.Provider>

@@ -10,6 +10,7 @@ import type {
   HistoryEntry,
   LocalSessionState,
   LocalUser,
+  LibraryKind,
   LoginLocalUserRequest,
   ProfilesState,
   SavedPlaylist,
@@ -260,9 +261,18 @@ function normalizeDb(raw: unknown): LocalDb {
   db.histories = typeof value.histories === 'object' && value.histories !== null ? (value.histories as Record<string, HistoryEntry[]>) : {}
   db.subscriptions =
     typeof value.subscriptions === 'object' && value.subscriptions !== null ? (value.subscriptions as Record<string, Subscription[]>) : {}
-  db.savedPlaylists =
-    typeof value.savedPlaylists === 'object' && value.savedPlaylists !== null ? (value.savedPlaylists as Record<string, SavedPlaylist[]>) : {}
-  db.savedVideos = typeof value.savedVideos === 'object' && value.savedVideos !== null ? (value.savedVideos as Record<string, SavedVideo[]>) : {}
+  const rawPlaylists = typeof value.savedPlaylists === 'object' && value.savedPlaylists !== null
+    ? value.savedPlaylists as Record<string, SavedPlaylist[]> : {}
+  db.savedPlaylists = Object.fromEntries(Object.entries(rawPlaylists).map(([profileId, playlists]) => [
+    profileId,
+    Array.isArray(playlists) ? playlists.map((playlist) => ({ ...playlist, library: playlist.library === 'music' ? 'music' : 'video' })) : []
+  ]))
+  const rawSavedVideos = typeof value.savedVideos === 'object' && value.savedVideos !== null
+    ? value.savedVideos as Record<string, SavedVideo[]> : {}
+  db.savedVideos = Object.fromEntries(Object.entries(rawSavedVideos).map(([profileId, videos]) => [
+    profileId,
+    Array.isArray(videos) ? videos.map((video) => ({ ...video, library: video.library === 'music' ? 'music' : 'video' })) : []
+  ]))
   db.searchHistories =
     typeof value.searchHistories === 'object' && value.searchHistories !== null
       ? (value.searchHistories as Record<string, SearchHistoryEntry[]>)
@@ -594,20 +604,21 @@ export async function clearActiveHistory(): Promise<void> {
   await persistDb(db)
 }
 
-export async function listActiveSavedPlaylists(): Promise<SavedPlaylist[]> {
+export async function listActiveSavedPlaylists(library: LibraryKind = 'video'): Promise<SavedPlaylist[]> {
   const db = await loadDb()
   const profile = requireActiveProfile(db)
-  return [...(db.savedPlaylists[profile.id] ?? [])].sort((a, b) => b.updatedAt - a.updatedAt)
+  return (db.savedPlaylists[profile.id] ?? []).filter((playlist) => playlist.library === library).sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
 export async function createActiveSavedPlaylist(request: CreateSavedPlaylistRequest): Promise<SavedPlaylist> {
   const db = await loadDb()
   const profile = requireActiveProfile(db)
   const name = normalizeName(request.name)
+  const library = request.library ?? 'video'
   if (!name) throw new Error('El nombre de la playlist no puede estar vacio.')
 
   const entries = db.savedPlaylists[profile.id] ?? []
-  const existing = entries.find((playlist) => playlist.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0)
+  const existing = entries.find((playlist) => playlist.library === library && playlist.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0)
   if (existing) return existing
 
   const timestamp = now()
@@ -616,6 +627,7 @@ export async function createActiveSavedPlaylist(request: CreateSavedPlaylistRequ
     profileId: profile.id,
     name,
     description: request.description?.trim() || null,
+    library,
     createdAt: timestamp,
     updatedAt: timestamp
   }
@@ -624,11 +636,12 @@ export async function createActiveSavedPlaylist(request: CreateSavedPlaylistRequ
   return playlist
 }
 
-export async function listActiveSavedVideos(playlistId?: string | null): Promise<SavedVideo[]> {
+export async function listActiveSavedVideos(playlistId?: string | null, library: LibraryKind = 'video'): Promise<SavedVideo[]> {
   const db = await loadDb()
   const profile = requireActiveProfile(db)
   const entries = db.savedVideos[profile.id] ?? []
-  const filtered = playlistId === undefined ? entries : entries.filter((video) => (video.playlistId ?? null) === playlistId)
+  const libraryEntries = entries.filter((video) => video.library === library)
+  const filtered = playlistId === undefined ? libraryEntries : libraryEntries.filter((video) => (video.playlistId ?? null) === playlistId)
   return [...filtered].sort((a, b) => b.savedAt - a.savedAt)
 }
 
@@ -636,15 +649,16 @@ export async function saveActiveVideo(request: SaveVideoRequest): Promise<SavedV
   const db = await loadDb()
   const profile = requireActiveProfile(db)
   const title = normalizeName(request.title)
+  const library = request.library ?? 'video'
   if (!request.videoId || !title) throw new Error('No se puede guardar un video sin titulo.')
 
   const playlistId = request.playlistId ?? null
-  if (playlistId && !(db.savedPlaylists[profile.id] ?? []).some((playlist) => playlist.id === playlistId)) {
+  if (playlistId && !(db.savedPlaylists[profile.id] ?? []).some((playlist) => playlist.id === playlistId && playlist.library === library)) {
     throw new Error('Playlist no encontrada.')
   }
 
   const entries = db.savedVideos[profile.id] ?? []
-  const existing = entries.find((video) => video.videoId === request.videoId && (video.playlistId ?? null) === playlistId)
+  const existing = entries.find((video) => video.library === library && video.videoId === request.videoId && (video.playlistId ?? null) === playlistId)
   const timestamp = now()
   const savedVideo: SavedVideo = {
     id: existing?.id ?? `saved-video-${randomUUID()}`,
@@ -655,6 +669,7 @@ export async function saveActiveVideo(request: SaveVideoRequest): Promise<SavedV
     channelName: normalizeName(request.channelName) || '(desconocido)',
     thumbnailUrl: request.thumbnailUrl,
     playlistId,
+    library,
     savedAt: timestamp
   }
 
@@ -670,12 +685,12 @@ export async function saveActiveVideo(request: SaveVideoRequest): Promise<SavedV
   return savedVideo
 }
 
-export async function removeActiveSavedVideo(videoId: string, playlistId?: string | null): Promise<void> {
+export async function removeActiveSavedVideo(videoId: string, playlistId?: string | null, library: LibraryKind = 'video'): Promise<void> {
   const db = await loadDb()
   const profile = requireActiveProfile(db)
   const targetPlaylistId = playlistId ?? null
   db.savedVideos[profile.id] = (db.savedVideos[profile.id] ?? []).filter((video) => {
-    return !(video.videoId === videoId && (video.playlistId ?? null) === targetPlaylistId)
+    return !(video.library === library && video.videoId === videoId && (video.playlistId ?? null) === targetPlaylistId)
   })
   await persistDb(db)
 }

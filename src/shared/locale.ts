@@ -20,6 +20,7 @@ export const english: Record<string, string> = {
   'Buscar en reproducción': 'Seek', 'Reproducir': 'Play', 'Pausar': 'Pause',
   'Volumen': 'Volume', 'Silenciar': 'Mute', 'Activar sonido': 'Unmute',
   'Cerrar reproductor': 'Close player', 'Minimizar reproductor': 'Minimize player',
+  'Imagen en imagen': 'Picture in picture',
   'Restaurar mini reproductor': 'Restore mini player', 'Volver al video': 'Return to video',
   'Retroceder 10 segundos': 'Rewind 10 seconds', 'Adelantar 10 segundos': 'Forward 10 seconds',
   'Esta página tuvo un error y no se pudo mostrar.': 'This page could not be displayed.',
