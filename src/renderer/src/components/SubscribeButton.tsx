@@ -1,4 +1,5 @@
 import { t, useLocale } from '../i18n/LocaleContext'
+import { Check } from 'lucide-react'
 export function SubscribeButton({ subscribed, busy = false, onClick }: {
   subscribed: boolean
   busy?: boolean
@@ -15,9 +16,7 @@ export function SubscribeButton({ subscribed, busy = false, onClick }: {
   >
     <span className="px-4">{subscribed ? t("Suscripto") : t("Suscribirse")}</span>
     {subscribed && <span className="wt-subscription-check" aria-hidden="true">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m5 12 4 4L19 6" />
-      </svg>
+      <Check className="h-4 w-4" strokeWidth={1.8} />
     </span>}
   </button>
 }

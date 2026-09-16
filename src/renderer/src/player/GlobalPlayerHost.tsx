@@ -2,6 +2,7 @@ import { t, useLocale } from '../i18n/LocaleContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { GradientLoader } from '../components/PlaybackStatusIcon'
 import { useAppTabs, usePageTab } from '../tabs/AppTabs'
 import { usePlayerWorkspace } from './PlayerWorkspace'
 // The ui build, not the core-only 'shaka-player' entry point — this file
@@ -88,7 +89,7 @@ export const SHORTS_SLOT_ID = 'global-player-shorts-slot'
  */
 export function GlobalPlayerHost() {
   const { language } = useLocale()
-  const { videoId, dashManifest, liveManifests, sabr, title, captions, storyboardVtt, playVideo, playVideoQueue, playbackMode, videoQueue, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
+  const { videoId, dashManifest, liveManifests, sabr, title, captions, storyboardVtt, playVideo, playVideoQueue, extendVideoQueue, playbackMode, videoQueue, shorts, openShort, status, relatedVideos } = useGlobalPlayer()
   const location = useLocation()
   const navigate = useNavigate()
   const { activeId: activeTabId } = useAppTabs()
@@ -102,6 +103,11 @@ export function GlobalPlayerHost() {
   const autoplayAllowedRef = useRef(true)
   const positionsRef = useRef(new Map<string, number>())
   const loadedVideoRef = useRef<string | null>(null)
+  const loadedPlaybackModeRef = useRef<'video' | 'music' | null>(null)
+  const startedVideoRef = useRef<string | null>(null)
+  const videoRecommendations = useMemo(() => relatedVideos
+    .filter((video) => video.videoId !== videoId && video.durationText !== 'LIVE')
+    .slice(0, 12), [relatedVideos, videoId])
 
   const hiddenHomeRef = useRef<HTMLDivElement | null>(null)
   const playerRef = useRef<shaka.Player | null>(null)
@@ -326,13 +332,21 @@ export function GlobalPlayerHost() {
           const index = shorts.findIndex((short) => short.videoId === videoId)
           const targetShort = index >= 0 ? shorts[index + (next ? 1 : -1)] : undefined
           if (targetShort) openShort(targetShort.videoId, shorts)
-        } else if (next && videoQueue.length) {
+        } else if (next) {
           const index = videoQueue.findIndex((video) => video.videoId === videoId)
-          const targetVideo = videoQueue[index + 1]
-          if (targetVideo) { void playVideoQueue(targetVideo.videoId, videoQueue); navigate(`/watch/${targetVideo.videoId}`) }
-        } else if (next && relatedVideos[0]) {
-          if (isWatchRoute) navigate(`/watch/${relatedVideos[0].videoId}`)
-          else void playVideo(relatedVideos[0].videoId)
+          const targetVideo = index >= 0 ? videoQueue[index + 1] : undefined
+          if (targetVideo) {
+            void playVideoQueue(targetVideo.videoId, videoQueue)
+            if (isWatchRoute) navigate(`/watch/${targetVideo.videoId}`)
+          } else if (videoRecommendations[0]) {
+            const seen = new Set(videoQueue.map((video) => video.videoId))
+            const additions = videoRecommendations.filter((video) => !seen.has(video.videoId))
+            const recommended = additions[0]
+            if (recommended) {
+              void playVideoQueue(recommended.videoId, videoQueue.length ? [...videoQueue, ...additions] : additions)
+              if (isWatchRoute) navigate(`/watch/${recommended.videoId}`)
+            }
+          }
         }
         return
       }
@@ -376,7 +390,7 @@ export function GlobalPlayerHost() {
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [videoEl, videoId, shorts, openShort, relatedVideos, playVideo, playVideoQueue, videoQueue, isWatchRoute, navigate, ownerId, tabId, shortsSlotId])
+  }, [videoEl, videoId, shorts, openShort, videoRecommendations, playVideoQueue, videoQueue, isWatchRoute, navigate, ownerId, tabId, shortsSlotId])
 
   useEffect(() => {
     const player = attachedPlayer
@@ -385,11 +399,13 @@ export function GlobalPlayerHost() {
     if (!player || player !== playerRef.current || !videoEl) return
     let cancelled = false
 
-    if (loadedVideoRef.current) {
+    if (loadedVideoRef.current && loadedPlaybackModeRef.current === 'video') {
       positionsRef.current.set(loadedVideoRef.current, videoEl.currentTime)
-      loadedVideoRef.current = null
     }
-    const resumeAt = videoId ? positionsRef.current.get(videoId) || 0 : 0
+    loadedVideoRef.current = null
+    loadedPlaybackModeRef.current = null
+    startedVideoRef.current = null
+    const resumeAt = playbackMode === 'video' && videoId ? positionsRef.current.get(videoId) || 0 : 0
 
     // Always tear down the previous video's SABR session (its `sabr:` scheme
     // handler and request state) before starting the next one — leaving it
@@ -471,6 +487,7 @@ export function GlobalPlayerHost() {
         .then(() => {
           if (cancelled || player.getAssetUri() !== session.manifestUri) return
           loadedVideoRef.current = videoId
+          loadedPlaybackModeRef.current = playbackMode
           console.log(`[timing] shaka load() (sabr) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
           void loadThumbnailsTrack(player, storyboardVtt)
           void finishLoading()
@@ -510,6 +527,7 @@ export function GlobalPlayerHost() {
       .then(() => {
         if (cancelled || player.getAssetUri() !== manifestUri) return
         loadedVideoRef.current = videoId
+        loadedPlaybackModeRef.current = playbackMode
         console.log(`[timing] shaka load() (dash) resolved ${(performance.now() - tLoadStart).toFixed(0)}ms after being called`)
         void loadThumbnailsTrack(player, storyboardVtt)
         void finishLoading()
@@ -550,26 +568,44 @@ export function GlobalPlayerHost() {
   }, [videoEl, shorts, videoId, status, openShort])
 
   useEffect(() => {
-    if (!videoEl || playbackMode !== 'video' || shorts.length > 0 || videoQueue.length < 2 || status !== 'ready') return
+    if (playbackMode !== 'video' || shorts.length > 0 || status !== 'ready' || !videoRecommendations.length) return
+    const index = videoQueue.findIndex((video) => video.videoId === videoId)
+    if (index >= 0 && videoQueue.length - index - 1 <= 2) extendVideoQueue(videoRecommendations)
+  }, [playbackMode, shorts.length, status, videoQueue, videoId, videoRecommendations, extendVideoQueue])
+
+  useEffect(() => {
+    if (!videoEl || playbackMode !== 'video' || shorts.length > 0 || status !== 'ready') return
     const onEnded = () => {
       if (!videoEl.ended) return
       const index = videoQueue.findIndex((video) => video.videoId === videoId)
       const next = index >= 0 ? videoQueue[index + 1] : undefined
       if (next) {
         void playVideoQueue(next.videoId, videoQueue)
-        navigate(`/watch/${next.videoId}`)
+        if (isWatchRoute) navigate(`/watch/${next.videoId}`)
+        return
+      }
+      const seen = new Set(videoQueue.map((video) => video.videoId))
+      if (videoId) seen.add(videoId)
+      const additions = videoRecommendations.filter((video) => !seen.has(video.videoId))
+      const recommended = additions[0]
+      if (recommended) {
+        void playVideoQueue(recommended.videoId, videoQueue.length ? [...videoQueue, ...additions] : additions)
+        if (isWatchRoute) navigate(`/watch/${recommended.videoId}`)
       }
     }
     videoEl.addEventListener('ended', onEnded)
     return () => videoEl.removeEventListener('ended', onEnded)
-  }, [videoEl, playbackMode, shorts.length, videoQueue, videoId, status, playVideoQueue, navigate])
+  }, [videoEl, playbackMode, shorts.length, videoQueue, videoId, status, videoRecommendations, playVideoQueue, isWatchRoute, navigate])
 
   useEffect(() => {
     if (!videoEl) return
 
     const emitState = () => {
+      if (loadedVideoRef.current && !videoEl.paused && videoEl.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) startedVideoRef.current = loadedVideoRef.current
       const detail: PlayerStateDetail = {
         tabId,
+        videoId: loadedVideoRef.current ?? undefined,
+        started: !!loadedVideoRef.current && startedVideoRef.current === loadedVideoRef.current,
         paused: videoEl.paused,
         currentTime: videoEl.currentTime || 0,
         duration: Number.isFinite(videoEl.duration) ? videoEl.duration : 0,
@@ -648,6 +684,7 @@ export function GlobalPlayerHost() {
     videoEl.addEventListener('loadedmetadata', emitState)
     videoEl.addEventListener('pause', emitState)
     videoEl.addEventListener('play', emitState)
+    videoEl.addEventListener('playing', emitState)
     videoEl.addEventListener('timeupdate', emitState)
     videoEl.addEventListener('volumechange', emitState)
     emitState()
@@ -659,6 +696,7 @@ export function GlobalPlayerHost() {
       videoEl.removeEventListener('loadedmetadata', emitState)
       videoEl.removeEventListener('pause', emitState)
       videoEl.removeEventListener('play', emitState)
+      videoEl.removeEventListener('playing', emitState)
       videoEl.removeEventListener('timeupdate', emitState)
       videoEl.removeEventListener('volumechange', emitState)
     }
@@ -688,7 +726,7 @@ export function GlobalPlayerHost() {
               />
             ))}
           </video>
-          {isInitialLoading && <div className="wt-initial-loader" role="status" aria-label={t('Cargando…')} />}
+          {isInitialLoading && <div className="wt-initial-loader" role="status" aria-label={t('Cargando…')}><GradientLoader label={t('Cargando…')} size={42} /></div>}
           {loadError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4 text-center text-white">
               <p className="text-sm">{loadError}</p>

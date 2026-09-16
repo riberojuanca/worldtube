@@ -1,6 +1,7 @@
 import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { Bookmark, Check, Music2 } from 'lucide-react'
 import { PROFILE_DATA_CHANGED_EVENT } from '../profiles/events'
 import { useProfiles } from '../profiles/ProfileContext'
 import type { LibraryKind, SavedPlaylist, SavedVideo, SaveVideoRequest } from '../../../shared/ipc'
@@ -16,43 +17,15 @@ interface VideoSaveButtonProps {
 }
 
 function SaveIcon({ className = 'h-4 w-4', filled = false }: { className?: string; filled?: boolean }) {
-  useLocale()
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
-    </svg>
-  )
+  return <Bookmark aria-hidden="true" className={className} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />
 }
 
 function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
-  useLocale()
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="m5 12 4 4L19 6" />
-    </svg>
-  )
+  return <Check aria-hidden="true" className={className} strokeWidth={1.8} />
 }
 
 function MusicIcon() {
-  return <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+  return <Music2 aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
 }
 
 function optionClass(isActive: boolean): string {

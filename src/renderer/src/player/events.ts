@@ -13,6 +13,8 @@ export type PlayerCommandDetail = { tabId?: string } & (
 
 export interface PlayerStateDetail {
   tabId?: string
+  videoId?: string
+  started: boolean
   paused: boolean
   currentTime: number
   duration: number

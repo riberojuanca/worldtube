@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { LibraryBig, ListMusic, SlidersHorizontal } from 'lucide-react'
 import { t, useLocale } from '../i18n/LocaleContext'
 import { VideoCard } from '../components/VideoCard'
 import { PageLoader } from '../components/PageLoader'
@@ -10,7 +11,7 @@ type Status = 'idle' | 'loading' | 'ready' | 'error'
 const defaultFilters: SearchFilters = { type: 'all', uploadDate: 'all', duration: 'all', sort: 'relevance' }
 
 function FilterIcon() {
-  return <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16M7 12h10M10 19h4" /></svg>
+  return <SlidersHorizontal aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
 }
 
 function CollectionCard({ item }: { item: SearchCollectionItem }) {
@@ -18,9 +19,9 @@ function CollectionCard({ item }: { item: SearchCollectionItem }) {
   const href = `/collection/${item.kind}/${encodeURIComponent(item.collectionId)}?title=${encodeURIComponent(item.title)}`
   return <Link to={href} className="group min-w-0 rounded no-underline">
     <div className={`relative overflow-hidden bg-neutral-900 ${item.kind === 'album' ? 'aspect-square rounded-lg' : 'aspect-video rounded'}`}>
-      {item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" /> : <div className="grid h-full place-items-center text-3xl text-neutral-600">♫</div>}
+      {item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" /> : <div className="grid h-full place-items-center text-neutral-600"><LibraryBig aria-hidden="true" className="h-8 w-8" strokeWidth={1.5} /></div>}
       <span className="absolute bottom-2 left-2 rounded bg-black/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">{kindLabel}</span>
-      {item.kind === 'playlist' && <div className="absolute inset-y-0 right-0 grid w-14 place-items-center bg-black/65 text-xl">☷</div>}
+      {item.kind === 'playlist' && <div className="absolute inset-y-0 right-0 grid w-14 place-items-center bg-black/65"><ListMusic aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} /></div>}
     </div>
     <h2 className="mt-2 line-clamp-2 break-words text-sm font-medium group-hover:text-white">{item.title}</h2>
     <p className="mt-1 truncate text-xs text-neutral-400">{[item.channelName, item.itemCountText].filter(Boolean).join(' · ')}</p>

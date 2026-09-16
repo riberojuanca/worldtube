@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { VideoSaveActions } from '../components/VideoSaveButton'
 import { VideoThumbnail } from '../components/VideoCard'
+import { PlaybackLoadingIcon } from '../components/PlaybackStatusIcon'
 import { SHORTS_SLOT_ID } from './GlobalPlayerHost'
 import { useGlobalPlayer } from './GlobalPlayerContext'
 
@@ -77,8 +78,8 @@ export function ShortsModal() {
       <div className={`absolute inset-0 ${slide ? slide.direction > 0 ? 'wt-short-enter-next' : 'wt-short-enter-previous' : ''}`}>
       <div id={`${SHORTS_SLOT_ID}-${ownerTabId}`} className="h-full w-full" />
       {status === 'loading' && <div role="status" className="pointer-events-none absolute inset-0 bg-black text-sm text-neutral-300">
-        {short && <VideoThumbnail videoId={short.videoId} thumbnailUrl={short.thumbnailUrl} title={short.title} />}
-        <span className="absolute inset-0 grid place-items-center bg-black/40">{t("Cargando...")}</span>
+        {short && <VideoThumbnail videoId={short.videoId} thumbnailUrl={short.thumbnailUrl} title={short.title} portrait />}
+        <span className="absolute inset-0 grid place-items-center bg-black/40"><PlaybackLoadingIcon /></span>
       </div>}
       {status === 'error' && <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85 p-3 text-center text-sm">
         <p className="line-clamp-3 break-words">{error}</p>
@@ -86,7 +87,7 @@ export function ShortsModal() {
       </div>}
       </div>
       {slide && <div aria-hidden="true" className={`pointer-events-none absolute inset-0 bg-black ${slide.direction > 0 ? 'wt-short-leave-next' : 'wt-short-leave-previous'}`}>
-        <VideoThumbnail videoId={slide.videoId} thumbnailUrl={slide.thumbnailUrl} title={slide.title} />
+        <VideoThumbnail videoId={slide.videoId} thumbnailUrl={slide.thumbnailUrl} title={slide.title} portrait />
       </div>}
     </div>
     <div className="h-16 min-w-0 overflow-hidden px-2 py-2">

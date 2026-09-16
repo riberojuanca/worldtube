@@ -23,24 +23,27 @@ interface VideoCardProps {
   previewUrl?: string | null
 }
 
+type ThumbnailQuality = 'compact' | 'grid' | 'featured'
+
 function uniqueValues(values: Array<string | null | undefined>): string[] {
   return values.filter((value, index): value is string => Boolean(value) && values.indexOf(value) === index)
 }
 
-function thumbnailCandidates(videoId: string, thumbnailUrl: string | null, portrait: boolean): string[] {
+function thumbnailCandidates(videoId: string, thumbnailUrl: string | null, portrait: boolean, quality: ThumbnailQuality): string[] {
+  const generated = quality === 'featured'
+    ? [`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`, thumbnailUrl, `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`]
+    : quality === 'compact'
+      ? [`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`, thumbnailUrl, `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`, `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`]
+      : [`https://i.ytimg.com/vi/${videoId}/sddefault.jpg`, thumbnailUrl, `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`]
   return uniqueValues([
     portrait ? thumbnailUrl : null,
-    `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-    `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
-    thumbnailUrl,
-    `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-    `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+    ...generated,
     `https://i.ytimg.com/vi/${videoId}/default.jpg`
   ])
 }
 
-export function VideoThumbnail({ videoId, thumbnailUrl, title, portrait = false, previewUrl, allowPreview = false }: { videoId: string; thumbnailUrl: string | null; title: string; portrait?: boolean; previewUrl?: string | null; allowPreview?: boolean }) {
-  const urls = useMemo(() => thumbnailCandidates(videoId, thumbnailUrl, portrait), [thumbnailUrl, videoId, portrait])
+export function VideoThumbnail({ videoId, thumbnailUrl, title, portrait = false, previewUrl, allowPreview = false, quality = 'grid' }: { videoId: string; thumbnailUrl: string | null; title: string; portrait?: boolean; previewUrl?: string | null; allowPreview?: boolean; quality?: ThumbnailQuality }) {
+  const urls = useMemo(() => thumbnailCandidates(videoId, thumbnailUrl, portrait, quality), [thumbnailUrl, videoId, portrait, quality])
   const [urlIndex, setUrlIndex] = useState(0)
   const { active } = usePageTab()
   const [previewing, setPreviewing] = useState(false)
@@ -63,7 +66,7 @@ export function VideoThumbnail({ videoId, thumbnailUrl, title, portrait = false,
 
   useEffect(() => {
     setUrlIndex(0)
-  }, [thumbnailUrl, videoId, portrait])
+  }, [thumbnailUrl, videoId, portrait, quality])
 
   const currentUrl = urls[urlIndex]
 
@@ -76,7 +79,7 @@ export function VideoThumbnail({ videoId, thumbnailUrl, title, portrait = false,
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded"
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden rounded"
       onPointerEnter={(event) => {
         if (!allowPreview || !active || portrait || event.pointerType !== 'mouse' || !window.matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').matches) return
         clearTimeout(timer.current)
@@ -87,9 +90,10 @@ export function VideoThumbnail({ videoId, thumbnailUrl, title, portrait = false,
       key={currentUrl}
       src={currentUrl}
       alt=""
-      className="h-full w-full object-cover"
-      loading="lazy"
+      className="absolute inset-0 block h-full min-h-0 w-full min-w-0 object-cover"
+      loading={quality === 'featured' ? 'eager' : 'lazy'}
       decoding="async"
+      fetchPriority={quality === 'featured' ? 'high' : 'auto'}
       onLoad={(event) => {
         if (event.currentTarget.naturalWidth <= 120 && urlIndex < urls.length - 1) setUrlIndex((index) => index === urlIndex ? index + 1 : index)
       }}
@@ -104,10 +108,10 @@ export function VideoCard({ videoId, title, channelId, channelName, thumbnailUrl
   const { openShort } = useGlobalPlayer()
   const open = shorts ? (event: MouseEvent) => { event.preventDefault(); openShort(videoId, shorts) } : undefined
   return (
-    <div className={`group flex flex-col gap-2 rounded p-1 hover:bg-neutral-900 ${featured ? 'h-full' : ''}`}>
-      <div className={`relative w-full rounded bg-neutral-900 ${portrait ? 'aspect-[9/16]' : 'aspect-video'}`}>
-        <Link to={`/watch/${videoId}`} onClick={open} className="block h-full w-full overflow-hidden rounded" aria-label={title}>
-          <VideoThumbnail videoId={videoId} thumbnailUrl={thumbnailUrl} title={title} portrait={portrait} previewUrl={previewUrl} allowPreview={badge !== 'LIVE'} />
+    <div className={`group flex min-w-0 flex-col gap-2 rounded p-1 hover:bg-neutral-900 ${featured ? 'h-full' : ''}`}>
+      <div className={`relative min-h-0 w-full overflow-hidden rounded bg-neutral-900 ${portrait ? 'aspect-[9/16]' : 'aspect-video'}`}>
+        <Link to={`/watch/${videoId}`} onClick={open} className="absolute inset-0 block overflow-hidden rounded" aria-label={title}>
+          <VideoThumbnail videoId={videoId} thumbnailUrl={thumbnailUrl} title={title} portrait={portrait} previewUrl={previewUrl} allowPreview={badge !== 'LIVE'} quality={featured ? 'featured' : 'grid'} />
           {badge && (
             <span className={`absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-xs font-medium ${badge === 'LIVE' ? 'wt-live-badge' : ''}`}>
               {badge}

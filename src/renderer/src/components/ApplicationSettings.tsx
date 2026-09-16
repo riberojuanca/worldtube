@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { t, useLocale } from '../i18n/LocaleContext'
 import type { UpdateState } from '../../../shared/ipc'
 
@@ -76,7 +77,7 @@ export function UpdateNotice() {
     <div className="flex items-center justify-between gap-3">
       <h2 className="text-sm font-medium">{t('Updates')}</h2>
       <button type="button" title={t('Cerrar')} aria-label={t('Cerrar')} onClick={() => setDismissedVersion(state.version)} className="grid h-8 w-8 cursor-pointer place-items-center rounded hover:bg-neutral-800">
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        <X aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
       </button>
     </div>
     <UpdateControls state={state} />

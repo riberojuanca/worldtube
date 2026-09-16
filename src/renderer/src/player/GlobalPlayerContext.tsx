@@ -45,6 +45,8 @@ export interface GlobalPlayerContextValue extends GlobalPlayerState {
   playVideo: (videoId: string, mode?: PlaybackMode) => Promise<void>
   playVideoQueue: (videoId: string, queue: SearchResultItem[]) => Promise<void>
   playMusic: (videoId: string, queue: MusicQueueItem[], sourcePath?: string) => Promise<void>
+  extendVideoQueue: (recommendations: SearchResultItem[]) => void
+  extendMusicQueue: (recommendations: MusicQueueItem[]) => void
   closePlayer: () => void
   shorts: SearchResultItem[]
   openShort: (videoId: string, videos: SearchResultItem[]) => void
@@ -85,6 +87,30 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   const [musicQueue, setMusicQueue] = useState<MusicQueueItem[]>([])
   const [musicSourcePath, setMusicSourcePath] = useState<string | null>(null)
   const [videoQueue, setVideoQueue] = useState<SearchResultItem[]>([])
+
+  const extendVideoQueue = useCallback((recommendations: SearchResultItem[]) => {
+    setVideoQueue((current) => {
+      const seen = new Set(current.map((video) => video.videoId))
+      const additions = recommendations.filter((video) => {
+        if (!video.videoId || seen.has(video.videoId)) return false
+        seen.add(video.videoId)
+        return true
+      })
+      return additions.length ? [...current, ...additions] : current
+    })
+  }, [])
+
+  const extendMusicQueue = useCallback((recommendations: MusicQueueItem[]) => {
+    setMusicQueue((current) => {
+      const seen = new Set(current.map((track) => track.videoId))
+      const additions = recommendations.filter((track) => {
+        if (!track.videoId || seen.has(track.videoId)) return false
+        seen.add(track.videoId)
+        return true
+      })
+      return additions.length ? [...current, ...additions] : current
+    })
+  }, [])
 
   // Guards against a stale response winning a race if the user jumps to a
   // second video before the first `getVideoInfo` call has resolved.
@@ -137,7 +163,7 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   const playVideoImpl = useCallback(async (videoId: string) => {
     const requestId = ++requestIdRef.current
 
-    setState((prev) => ({ ...prev, videoId, status: 'loading', error: null, dashManifest: null, liveManifests: null, sabr: null }))
+    setState((prev) => ({ ...prev, videoId, status: 'loading', error: null, relatedVideos: [], dashManifest: null, liveManifests: null, sabr: null }))
 
     const response = await window.api.getVideoInfo(videoId)
     if (requestIdRef.current !== requestId) return
@@ -219,8 +245,8 @@ export function GlobalPlayerProvider({ children, tabId = '', onOpenShort }: { ch
   const dismissShorts = useCallback(() => setShorts([]), [])
 
   const value = useMemo<GlobalPlayerContextValue>(
-    () => ({ ...state, ownerTabId: tabId, playbackMode, musicQueue, musicSourcePath, videoQueue, playVideo, playVideoQueue, playMusic, closePlayer, shorts, openShort, dismissShorts }),
-    [state, tabId, playbackMode, musicQueue, musicSourcePath, videoQueue, playVideo, playVideoQueue, playMusic, closePlayer, shorts, openShort, dismissShorts]
+    () => ({ ...state, ownerTabId: tabId, playbackMode, musicQueue, musicSourcePath, videoQueue, playVideo, playVideoQueue, playMusic, extendVideoQueue, extendMusicQueue, closePlayer, shorts, openShort, dismissShorts }),
+    [state, tabId, playbackMode, musicQueue, musicSourcePath, videoQueue, playVideo, playVideoQueue, playMusic, extendVideoQueue, extendMusicQueue, closePlayer, shorts, openShort, dismissShorts]
   )
 
   return <GlobalPlayerContext.Provider value={value}>{children}</GlobalPlayerContext.Provider>

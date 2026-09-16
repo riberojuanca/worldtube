@@ -10,6 +10,23 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  ArrowDownRight,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  History as HistoryIcon,
+  Pause,
+  PictureInPicture2,
+  Play,
+  RotateCcw,
+  RotateCw,
+  Search as SearchIcon,
+  UserRound,
+  Volume2,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { GlobalPlayerProvider, useGlobalPlayer } from './player/GlobalPlayerContext'
 import { GlobalPlayerHost, MINI_SLOT_ID } from './player/GlobalPlayerHost'
 import { MusicMiniPlayer } from './player/MusicPlayer'
@@ -18,6 +35,7 @@ import { PLAYER_COMMAND_EVENT, PLAYER_STATE_EVENT, type PlayerCommandDetail, typ
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChannelAvatar } from './components/ChannelAvatar'
 import { BrandMark } from './components/BrandMark'
+import { PlaybackLoadingIcon } from './components/PlaybackStatusIcon'
 import { NavigationIcon } from './components/NavigationIcon'
 import { UpdateNotice } from './components/ApplicationSettings'
 import { ProfileProvider, useProfiles } from './profiles/ProfileContext'
@@ -57,56 +75,26 @@ type IconName =
   | 'x'
 
 function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
-  useLocale()
-  const paths: Record<IconName, JSX.Element> = {
-    arrowDownRight: <path d="m17 7-10 10M7 9v8h8" />,
-    arrowUpRight: <path d="M7 17 17 7M9 7h8v8" />,
-    back: <path d="M15 6 9 12l6 6M10 12h11" />,
-    forward: <path d="m9 6 6 6-6 6M14 12H3" />,
-    forward10: (
-      <>
-        <path d="M15 5h4v4" />
-        <path d="M18.5 9A7 7 0 1 0 17 17.3" />
-        <text fill="currentColor" fontSize="7" fontWeight="700" stroke="none" textAnchor="middle" x="12" y="15.5">
-          10
-        </text>
-      </>
-    ),
-    history: <path d="M12 8v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v5h5" />,
-    pause: <path d="M8 5v14M16 5v14" />,
-    pictureInPicture: <><rect x="3" y="5" width="18" height="14" rx="2" /><rect x="11" y="11" width="7" height="5" rx="1" /></>,
-    play: <path d="m8 5 11 7-11 7V5Z" />,
-    replay10: (
-      <>
-        <path d="M9 5H5v4" />
-        <path d="M5.5 9A7 7 0 1 1 7 17.3" />
-        <text fill="currentColor" fontSize="7" fontWeight="700" stroke="none" textAnchor="middle" x="12" y="15.5">
-          10
-        </text>
-      </>
-    ),
-    rewind: <path d="m11 19-8-7 8-7v14Zm10 0-8-7 8-7v14Z" />,
-    refresh: <path d="M20 7v5h-5M19.2 12a7.2 7.2 0 1 0-2 5M20 12l-2-5" />,
-    search: <path d="m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4z" />,
-    user: <path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" />,
-    volume: <path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />,
-    x: <path d="M6 6l12 12M18 6 6 18" />
+  const icons: Record<IconName, LucideIcon> = {
+    arrowDownRight: ArrowDownRight,
+    arrowUpRight: ArrowUpRight,
+    back: ArrowLeft,
+    forward: ArrowRight,
+    forward10: RotateCw,
+    history: HistoryIcon,
+    pause: Pause,
+    pictureInPicture: PictureInPicture2,
+    play: Play,
+    replay10: RotateCcw,
+    rewind: RotateCcw,
+    refresh: RotateCw,
+    search: SearchIcon,
+    user: UserRound,
+    volume: Volume2,
+    x: X
   }
-
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      {paths[name]}
-    </svg>
-  )
+  const SelectedIcon = icons[name]
+  return <SelectedIcon aria-hidden="true" className={className} strokeWidth={1.8} />
 }
 
 function profileInitial(profile: UserProfile): string {
@@ -483,7 +471,7 @@ function TopNav() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 grid h-[60px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-neutral-800 bg-neutral-900 px-2 shadow-lg shadow-black/20 max-[680px]:fixed max-[680px]:inset-x-0 max-[680px]:top-0 max-[680px]:grid-cols-[1fr_auto]">
+      <header className="wt-topbar sticky top-0 z-40 grid h-[60px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-neutral-800 bg-neutral-900 px-2 shadow-lg shadow-black/20 max-[680px]:fixed max-[680px]:inset-x-0 max-[680px]:top-0 max-[680px]:grid-cols-[1fr_auto]">
         <div className="flex min-w-0 items-center gap-1">
           <Link
             to="/"
@@ -541,7 +529,7 @@ function TopNav() {
         </div>
       </header>
       {isMobileSearchOpen && (
-        <div className="fixed inset-x-0 top-[60px] z-40 border-b border-neutral-800 bg-neutral-900 p-2 min-[681px]:hidden">
+        <div className="wt-topbar fixed inset-x-0 top-[60px] z-40 border-b border-neutral-800 bg-neutral-900 p-2 min-[681px]:hidden">
           <SearchBar />
         </div>
       )}
@@ -583,7 +571,7 @@ function SideNav({ isOpen }: { isOpen: boolean }) {
     <nav
       aria-label={t('Secciones')}
       className={[
-        'sticky top-[60px] z-30 h-[calc(100vh-60px)] shrink-0 overflow-hidden border-r border-neutral-800 bg-neutral-900 transition-[width] duration-150 ease-in-out max-[680px]:fixed max-[680px]:inset-x-0 max-[680px]:bottom-0 max-[680px]:top-auto max-[680px]:h-[60px] max-[680px]:w-full max-[680px]:border-r-0 max-[680px]:border-t',
+        'wt-sidebar sticky top-[60px] z-30 h-[calc(100vh-60px)] shrink-0 overflow-hidden border-r border-neutral-800 bg-neutral-900 transition-[width] duration-150 ease-in-out max-[680px]:fixed max-[680px]:inset-x-0 max-[680px]:bottom-0 max-[680px]:top-auto max-[680px]:h-[60px] max-[680px]:w-full max-[680px]:border-r-0 max-[680px]:border-t',
         isOpen ? 'w-[200px]' : 'w-20'
       ].join(' ')}
     >
@@ -679,7 +667,7 @@ function isRangeControlTarget(target: EventTarget | null): boolean {
 
 function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
   useLocale()
-  const { videoId, title, channelName, closePlayer, playbackMode, shorts, ownerTabId } = useGlobalPlayer()
+  const { videoId, title, channelName, closePlayer, playbackMode, shorts, ownerTabId, status } = useGlobalPlayer()
   const { activeId, select, navigatorFor, tabs: tabsForMini } = useAppTabs()
   function returnToWatch() {
     select(ownerTabId)
@@ -693,7 +681,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
   const [isRestorePreview, setIsRestorePreview] = useState(false)
   const [isDragPointerActive, setIsDragPointerActive] = useState(false)
   const [miniPosition, setMiniPosition] = useState<{ x: number; y: number } | null>(null)
-  const [playerState, setPlayerState] = useState<PlayerStateDetail>({ paused: true, currentTime: 0, duration: 0, volume: 1 })
+  const [playerState, setPlayerState] = useState<PlayerStateDetail>({ started: false, paused: true, currentTime: 0, duration: 0, volume: 1 })
   const miniRef = useRef<HTMLDivElement | null>(null)
   const minimizedBarRef = useRef<HTMLElement | null>(null)
   const dragRef = useRef<{
@@ -933,6 +921,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
   const hasTimeline = Number.isFinite(playerState.duration) && playerState.duration > 0
   const timelineValue = hasTimeline ? clampNumber(playerState.currentTime, 0, playerState.duration) : 0
   const volumeValue = clampNumber(playerState.volume, 0, 1)
+  const playerStarting = status === 'loading' || playerState.videoId !== videoId || !playerState.started
   const timelineRangeStyle = { '--wt-range-progress': `${hasTimeline ? (timelineValue / playerState.duration) * 100 : 0}%` } as CSSProperties
   const volumeRangeStyle = { '--wt-range-progress': `${volumeValue * 100}%` } as CSSProperties
 
@@ -943,7 +932,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
         ref={minimizedBarRef}
         onClickCapture={handleDraggedClickCapture}
         className={[
-          'fixed bottom-0 right-0 z-50 touch-none select-none border-t border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity max-[680px]:bottom-[60px] max-[680px]:left-0',
+          'wt-player-bar fixed bottom-0 right-0 z-50 touch-none select-none border-t border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity max-[680px]:bottom-[60px] max-[680px]:left-0',
           dragCursorClass,
           isMinimizePreview && !isMinimized ? 'pointer-events-none opacity-45' : 'opacity-100',
           isSideNavOpen ? 'min-[681px]:left-[200px]' : 'min-[681px]:left-20'
@@ -988,13 +977,14 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
             </button>
             <button
               type="button"
+              disabled={playerStarting}
               onClick={() => sendPlayerCommand({ action: 'toggle-play' })}
-              aria-label={playerState.paused ? t("Reproducir") : t("Pausar")}
-              title={playerState.paused ? t("Reproducir") : t("Pausar")}
-              className="wt-action grid h-9 w-9 cursor-pointer place-items-center rounded"
+              aria-label={playerStarting ? t('Cargando…') : playerState.paused ? t("Reproducir") : t("Pausar")}
+              title={playerStarting ? t('Cargando…') : playerState.paused ? t("Reproducir") : t("Pausar")}
+              className={`${playerStarting ? 'bg-transparent text-neutral-300' : 'wt-player-active-control'} grid h-9 w-9 cursor-pointer place-items-center rounded disabled:cursor-wait`}
               data-player-control="true"
             >
-              <Icon name={playerState.paused ? 'play' : 'pause'} className="h-4 w-4" />
+              {playerStarting ? <PlaybackLoadingIcon compact /> : <Icon name={playerState.paused ? 'play' : 'pause'} className="h-4 w-4" />}
             </button>
             <button
               type="button"
@@ -1066,7 +1056,7 @@ function MiniPlayer({ isSideNavOpen }: { isSideNavOpen: boolean }) {
         <aside
           onClickCapture={handleDraggedClickCapture}
           className={[
-            'grid touch-none select-none grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity',
+            'wt-player-bar grid touch-none select-none grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border bg-neutral-900 shadow-2xl shadow-black/40 transition-opacity',
             dragCursorClass,
             isMinimizePreview ? 'border-neutral-100/60 opacity-35 ring-2 ring-neutral-100/20' : 'border-neutral-800 opacity-100'
           ].join(' ')}
@@ -1155,7 +1145,7 @@ export default function App() {
   return (
     <ProfileProvider>
       <PlayerWorkspaceProvider>
-        <TabLinkHandler><div className="min-h-screen bg-neutral-950 text-neutral-100">
+        <TabLinkHandler><div className="wt-app-shell min-h-screen text-neutral-100">
           <TopNav />
           <div className="flex min-h-[calc(100vh-60px)] max-[680px]:block max-[680px]:pb-[72px] max-[680px]:pt-[60px]">
             <SideNav isOpen={isSideNavOpen} />
@@ -1165,7 +1155,7 @@ export default function App() {
             </main>
           </div>
           <MiniPlayer isSideNavOpen={isSideNavOpen} />
-          <MusicMiniPlayer />
+          <MusicMiniPlayer isSideNavOpen={isSideNavOpen} />
           <ShortsModal />
           <UpdateNotice />
         </div></TabLinkHandler>

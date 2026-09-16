@@ -16,13 +16,16 @@
   --shaka-rate-preset-border: var(--wt-accent-text);
 }
 
-/* Keep Shaka's buffering state, replace only its circular artwork. */
-.shaka-spinner > svg {
-  display: none !important;
+.shaka-big-buttons-container .shaka-play-button {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--wt-accent) 42%, var(--wt-palette-3)), var(--wt-palette-4)) !important;
+  color: #031020 !important;
 }
 
-.wt-initial-loader,
-.shaka-spinner::after,
+.shaka-controls-button-panel > .shaka-play-button,
+.shaka-controls-top-button-panel > .shaka-play-button {
+  color: var(--wt-palette-4) !important;
+}
+
 .shaka-play-button:has(.shaka-ui-icon[viewBox='0 0 38 38'])::after {
   content: '';
   display: block;
@@ -32,18 +35,14 @@
   pointer-events: none;
 }
 
-.wt-initial-loader,
-.shaka-spinner::after {
-  width: 96px;
-  height: 40px;
-}
-
 .wt-initial-loader {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 3;
+  display: grid;
+  place-items: center;
 }
 
 .wt-player-loading .shaka-controls-container,
@@ -72,8 +71,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wt-initial-loader,
-  .shaka-spinner::after,
   .shaka-play-button:has(.shaka-ui-icon[viewBox='0 0 38 38'])::after {
     animation: none;
     opacity: .8;

@@ -1,6 +1,7 @@
 import { t, useLocale } from '../i18n/LocaleContext'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Check, Clock3, Eye, Share2, Tag, ThumbsUp, type LucideIcon } from 'lucide-react'
 import { ChannelAvatar } from '../components/ChannelAvatar'
 import { SubscribeButton } from '../components/SubscribeButton'
 import { VideoSaveActions } from '../components/VideoSaveButton'
@@ -17,30 +18,16 @@ import type { SavedPlaylist, SavedVideo, SearchResultItem } from '../../../share
 type IconName = 'check' | 'clock' | 'share' | 'eye' | 'tag' | 'thumb'
 
 function Icon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
-  useLocale()
-  const paths: Record<IconName, JSX.Element> = {
-    check: <path d="m5 12 4 4L19 6" />,
-    clock: <path d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />,
-    share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" /></>,
-    eye: <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />,
-    tag: <path d="M20 10v8a2 2 0 0 1-2 2h-8L4 14V6a2 2 0 0 1 2-2h8l6 6Z M8 8h.01" />,
-    thumb: <path d="M7 11v9M7 11H4v9h3M7 11l4-8h1.5a2 2 0 0 1 2 2.3L14 8h4a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 16.8 19H7" />
+  const icons: Record<IconName, LucideIcon> = {
+    check: Check,
+    clock: Clock3,
+    share: Share2,
+    eye: Eye,
+    tag: Tag,
+    thumb: ThumbsUp
   }
-
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      {paths[name]}
-    </svg>
-  )
+  const SelectedIcon = icons[name]
+  return <SelectedIcon aria-hidden="true" className={className} strokeWidth={1.8} />
 }
 
 function parseTimestamp(value: string): number | null {
@@ -114,7 +101,7 @@ function RelatedVideoRow({ video }: { video: SearchResultItem }) {
     <article className="group grid grid-cols-[150px_minmax(0,1fr)] gap-2 rounded p-1 transition-colors hover:bg-neutral-900 max-[480px]:grid-cols-[132px_minmax(0,1fr)]">
       <div className="relative aspect-video rounded bg-neutral-900">
         <Link to={`/watch/${video.videoId}`} className="block h-full w-full overflow-hidden rounded" aria-label={video.title}>
-          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} previewUrl={video.previewUrl} allowPreview={video.durationText !== 'LIVE'} />
+          <VideoThumbnail videoId={video.videoId} thumbnailUrl={video.thumbnailUrl} title={video.title} previewUrl={video.previewUrl} allowPreview={video.durationText !== 'LIVE'} quality="compact" />
           {video.durationText && (
             <span className={`absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 text-[11px] font-medium leading-none text-white ${video.durationText === 'LIVE' ? 'wt-live-badge' : ''}`}>
               {video.durationText}
@@ -163,7 +150,6 @@ export function Watch() {
   const openedVideo = useRef<string | null>(null)
   if (globalPlayer.videoId === videoId && globalPlayer.status === 'ready') snapshot.current = globalPlayer
   const {
-    playVideo,
     videoId: activeVideoId,
     title,
     channelId,
@@ -223,11 +209,27 @@ export function Watch() {
     setCopyState('idle')
     if (videoId && videoId !== activeVideoId) {
       requestPlayback(tabId)
-      void globalPlayer.playVideo(videoId)
+      const queued = globalPlayer.videoQueue.some((video) => video.videoId === videoId)
+      if (queued) void globalPlayer.playVideoQueue(videoId, globalPlayer.videoQueue)
+      else void globalPlayer.playVideo(videoId)
     }
     // Only re-run when the route param itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId, isTabActive])
+
+  useEffect(() => {
+    if (!playlistId || !videoId || activeVideoId !== videoId || !playlistVideos.length) return
+    globalPlayer.extendVideoQueue(playlistVideos.map((video) => ({
+      videoId: video.videoId,
+      title: video.title,
+      channelId: video.channelId,
+      channelName: video.channelName,
+      thumbnailUrl: video.thumbnailUrl,
+      durationText: null,
+      viewCountText: null,
+      publishedText: null
+    })))
+  }, [playlistId, playlistVideos, videoId, activeVideoId, globalPlayer.extendVideoQueue])
 
   useEffect(() => {
     if (isCurrentVideo && title && status === 'ready') rename(tabId, title)
@@ -383,7 +385,7 @@ export function Watch() {
               aria-current={item.videoId === videoId ? 'true' : undefined}
               className={`grid grid-cols-[20px_96px_minmax(0,1fr)] items-center gap-2 px-2 py-2 hover:bg-neutral-800 ${item.videoId === videoId ? 'bg-neutral-800' : ''}`}>
               <span className={`text-center text-xs ${item.videoId === videoId ? 'wt-accent-text' : 'text-neutral-500'}`}>{item.videoId === videoId ? '>' : index + 1}</span>
-              <div className="aspect-video overflow-hidden rounded"><VideoThumbnail videoId={item.videoId} thumbnailUrl={item.thumbnailUrl} title={item.title} allowPreview /></div>
+              <div className="aspect-video overflow-hidden rounded"><VideoThumbnail videoId={item.videoId} thumbnailUrl={item.thumbnailUrl} title={item.title} allowPreview quality="compact" /></div>
               <div className="min-w-0"><h3 className="line-clamp-2 break-words text-sm font-medium text-neutral-100">{item.title}</h3><p className="mt-1 truncate text-xs text-neutral-400">{item.channelName}</p></div>
             </Link>)}
             {!playlistVideos.length && <p className="p-3 text-sm text-neutral-400">{t('This playlist is empty')}</p>}
