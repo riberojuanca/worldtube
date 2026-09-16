@@ -237,6 +237,20 @@ export class ShakaSabrPlayerAdapter implements SabrPlayerAdapter {
     this.assertRequestActive(url, abortController)
     const finalResponse = (await responseInterceptor(response)) ?? response
     this.assertRequestActive(url, abortController)
+
+    // A repeatable multi-second playhead jump means Shaka found a hole in
+    // the buffered timeline. Record whether YouTube returned a segment whose
+    // timestamp differs from the one requested so the protocol error can be
+    // fixed at its source instead of hidden with Shaka gap settings.
+    const requestedSeconds = segment.getStartTime()
+    const deliveredStartMs = metadata.streamInfo?.mediaHeader?.startMs
+    if (requestedSeconds !== null && deliveredStartMs !== undefined) {
+      const deliveredSeconds = Number(deliveredStartMs) / 1000
+      if (Number.isFinite(deliveredSeconds) && Math.abs(deliveredSeconds - requestedSeconds) > 0.25) {
+        const parsed = parseSabrUri(url)
+        console.warn(`[sabr-gap] requested=${requestedSeconds.toFixed(3)}s delivered=${deliveredSeconds.toFixed(3)}s format=${parsed.key || 'unknown'}`)
+      }
+    }
     return finalResponse
   }
 }
