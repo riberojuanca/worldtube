@@ -17,7 +17,7 @@ export function PlaybackStatusIcon({ paused, className = 'h-8 w-8' }: { paused: 
 }
 
 export function GradientLoader({ size, label = 'Cargando' }: { size: number; label?: string }) {
-  return <ClipLoader aria-label={label} color="var(--wt-palette-3)" cssOverride={gradientLoaderStyle} size={size} speedMultiplier={0.85} />
+  return <ClipLoader aria-label={label} className="wt-playback-loader" color="var(--wt-palette-3)" cssOverride={gradientLoaderStyle} size={size} speedMultiplier={0.85} />
 }
 
 export function PlaybackLoadingIcon({ compact = false }: { compact?: boolean }) {

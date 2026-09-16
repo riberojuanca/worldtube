@@ -280,6 +280,10 @@ video,
   filter: brightness(1.08);
 }
 
+.wt-playback-loader {
+  border-radius: 50% !important;
+}
+
 .wt-action-important {
   background-color: var(--wt-important);
   color: var(--wt-on-important);
