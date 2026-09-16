@@ -2,7 +2,7 @@
   "name": "worldtube",
   "private": true,
   "license": "AGPL-3.0-only",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A local-first YouTube desktop client with persistent playback and independent tabs.",
   "author": "riberojuanca",
   "homepage": "https://github.com/riberojuanca/worldtube",
